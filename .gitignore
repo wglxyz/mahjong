@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Flutter / Dart
+client_flutter/.dart_tool/
+client_flutter/build/
+client_flutter/.flutter-plugins
+client_flutter/.flutter-plugins-dependencies
+client_flutter/.packages
+client_flutter/ios/Pods/
+client_flutter/ios/.symlinks/
+client_flutter/macos/Pods/
+client_flutter/macos/Flutter/ephemeral/
+client_flutter/android/.gradle/
+client_flutter/android/local.properties
+client_flutter/android/key.properties
+client_flutter/android/app/release/
+client_flutter/android/captures/
+client_flutter/**/.cxx/
+
+# Claude Code: per-machine permission allowlist
+.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
