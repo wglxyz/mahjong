@@ -8,17 +8,20 @@ Implements the mahjong.ruleset.Ruleset protocol. Delegates:
 
 State this ruleset maintains via player.attrs and state.attrs (set via observe()):
   - player.attrs["riichi"]            : riichi declared
+  - player.attrs["double_riichi"]     : declared on first turn with no calls
   - player.attrs["ippatsu"]           : ippatsu eligibility window open
   - player.attrs["ippatsu_skip_one"]  : skip the riichi-discard itself when expiring
-  - state.attrs["rinshan_pending"]    : last draw was from dead wall (kan replacement)
-  - state.attrs["dealer_seat"]        : seat of the current dealer
+  - player.attrs["draw_count"]        : draws taken this hand (for first-turn yaku)
+  - state.attrs["mj_rinshan_pending"] : last draw was from dead wall (kan replacement)
+  - state.attrs["mj_dealer_seat"]     : seat of the current dealer
+  - state.attrs["mj_any_call_yet"]    : True after first MeldFormed (kills tenhou/chiihou)
+  - state.attrs["mj_first_discards"]  : list of (seat, code) for first-round abort check
+  - state.attrs["mj_abort_reason"]    : tag set when an abort fires
 
-Known simplifications vs full riichi:
-  - No furiten check (a player whose own discards include a winning tile can still ron)
-  - No chankan (ron on shouminkan upgrade) — would require a new response window
-  - No double-riichi tracking (always single riichi)
-  - No nagashi mangan
-  - Head-bump priority on simultaneous rons (atama-hane), not double-ron
+Known remaining simplifications (see TODO.md for the full list):
+  - Permanent furiten only — no temporary (skipped-ron) furiten
+  - No tenpai/noten penalty at exhaustive drawn game
+  - Single-hand session (no East-round rotation; that lives at the Session layer)
 """
 from __future__ import annotations
 from typing import cast
@@ -29,6 +32,7 @@ from core.state import GameState
 from core.zone import Ordering, Visibility, Zone
 from mahjong.actions import (
     ChiAction,
+    DeclareAbortAction,
     DeclareRiichiAction,
     DeclareWinAction,
     DiscardAction,
@@ -62,13 +66,35 @@ def _all_tile_codes() -> list[tuple[str, int]]:
     return out
 
 
-def _is_tenpai(concealed_tiles: list[Tile], declared_melds: list[Meld]) -> bool:
-    """True iff any 1-tile addition would yield a winning shape."""
+def _waiting_codes(concealed_tiles: list[Tile], declared_melds: list[Meld]) -> set[str]:
+    """The set of tile codes that would complete the hand."""
+    waits: set[str] = set()
     for suit, rank in _all_tile_codes():
         probe = Tile(suit, rank)
         if all_decompositions(concealed_tiles + [probe], declared_melds, probe):
-            return True
-    return False
+            waits.add(f"{suit}{rank}")
+    return waits
+
+
+def _is_tenpai(concealed_tiles: list[Tile], declared_melds: list[Meld]) -> bool:
+    """True iff any 1-tile addition would yield a winning shape."""
+    return bool(_waiting_codes(concealed_tiles, declared_melds))
+
+
+def _is_furiten(
+    concealed_tiles: list[Tile],
+    declared_melds: list[Meld],
+    own_discards: list[Tile],
+) -> bool:
+    """Permanent furiten: at least one waiting tile sits in the player's own discard pile.
+
+    Furiten disables ron entirely (tsumo is still allowed). Temporary furiten (skipped
+    ron until next own draw) is not modelled.
+    """
+    waits = _waiting_codes(concealed_tiles, declared_melds)
+    if not waits:
+        return False
+    return any(t.code in waits for t in own_discards)
 
 
 def _count_dora(decomp_groups, indicators: list[Tile]) -> int:
@@ -96,6 +122,27 @@ def _count_red(concealed_tiles: list[Tile], declared_melds: list[Meld]) -> int:
 def _seat_wind(seat: PlayerId, dealer: PlayerId, seats: int = 4) -> int:
     """Returns wind index 1..4 for the given seat given the dealer's seat (East)."""
     return ((seat - dealer) % seats) + 1
+
+
+def _is_terminal_or_honor(tile: Tile) -> bool:
+    return tile.suit == SUIT_Z or (tile.suit in NUMERIC_SUITS and tile.rank in (1, 9))
+
+
+def _find_tile_anywhere(state: GameState, tile_id: int) -> Tile | None:
+    for z in state.zones.values():
+        for it in z.items:
+            if getattr(it, "id", None) == tile_id:
+                return cast(Tile, it)
+    for p in state.players.values():
+        for z in p.zones.values():
+            for it in z.items:
+                if isinstance(it, Meld):
+                    for tt in it.tiles:
+                        if tt.id == tile_id:
+                            return tt
+                elif getattr(it, "id", None) == tile_id:
+                    return cast(Tile, it)
+    return None
 
 
 # ---- ruleset ---------------------------------------------------------------
@@ -187,6 +234,19 @@ class RiichiRuleset:
                         DeclareRiichiAction(actor=seat, discard_tile_id=t.id)
                     )
 
+        # --- NINE-TERMINALS abort -------------------------------------------
+        # Offered only on this seat's first turn, with no calls intervening.
+        is_first_turn = (
+            not state.attrs.get("mj_any_call_yet")
+            and p.attrs.get("draw_count", 0) == 1
+        )
+        if is_first_turn:
+            unique_terminal_honor = {tt.code for tt in hand if _is_terminal_or_honor(tt)}
+            if len(unique_terminal_honor) >= 9:
+                actions.append(
+                    DeclareAbortAction(actor=seat, reason="nine_terminals")
+                )
+
         return actions
 
     def legal_after_call(self, state: GameState, seat: PlayerId) -> list[Action]:
@@ -204,8 +264,15 @@ class RiichiRuleset:
     def legal_responses(
         self, state: GameState, discard_seat: PlayerId, discarded_tile_id: int
     ) -> dict[PlayerId, list[Action]]:
-        discards = state.players[discard_seat].zones["discards"]
-        d_tile = next(cast(Tile, t) for t in discards.items if t.id == discarded_tile_id)
+        is_chankan = state.attrs.get("mj_phase") == "chankan"
+        if is_chankan:
+            # the "discarded" tile lives in the kanner's meld zone, not the discard pile
+            d_tile = _find_tile_anywhere(state, discarded_tile_id)
+            if d_tile is None:
+                return {s: [PassAction(actor=s)] for s in range(self.seats) if s != discard_seat}
+        else:
+            discards = state.players[discard_seat].zones["discards"]
+            d_tile = next(cast(Tile, t) for t in discards.items if t.id == discarded_tile_id)
         wall_empty = state.zones["wall"].is_empty()
 
         out: dict[PlayerId, list[Action]] = {}
@@ -222,17 +289,20 @@ class RiichiRuleset:
             # --- RON ---------------------------------------------------------
             full_hand = hand + [d_tile]
             decomps = all_decompositions(full_hand, declared, d_tile)
-            if decomps:
+            own_discards = [cast(Tile, t) for t in p.zones["discards"].items]
+            if decomps and not _is_furiten(hand, declared, own_discards):
                 ctx = self._build_ctx(state, seat, winning_tile=d_tile, is_tsumo=False, declared=declared)
                 ctx.is_houtei = wall_empty
+                if is_chankan:
+                    ctx.is_chankan = True
                 ctx.dora_count = _count_dora_for_best(decomps, ctx, state)
                 ctx.red_dora_count = _count_red(hand, declared) + (1 if d_tile.red else 0)
                 yres = evaluate(decomps, ctx)
                 if yres is not None:
                     legal.append(DeclareWinAction(actor=seat, kind="ron"))
 
-            if riichi:
-                # only ron is allowed in response (no calls after riichi)
+            if is_chankan or riichi:
+                # in chankan mode only ron is allowed; riichi'd seats also can't call
                 out[seat] = legal
                 continue
 
@@ -292,27 +362,29 @@ class RiichiRuleset:
 
     def resolve_response_priority(
         self, state: GameState, decisions: dict[PlayerId, Action]
-    ) -> tuple[PlayerId, Action] | None:
+    ) -> list[tuple[PlayerId, Action]] | None:
         d_seat = cast(PlayerId, state.attrs["mj_last_discard_seat"])
 
-        # ron beats everything; head-bump if multiple
+        # ron beats everything. Triple-ron aborts the hand; double-ron splits.
         rons = [(s, a) for s, a in decisions.items() if isinstance(a, DeclareWinAction)]
         if rons:
+            if len(rons) >= 3:
+                state.attrs["mj_abort_reason"] = "triple_ron"
+                return []
             rons.sort(key=lambda sa: (sa[0] - d_seat) % self.seats)
-            return rons[0]
+            return rons
 
-        # pon/kan beats chi
         pons_kans = [
             (s, a)
             for s, a in decisions.items()
             if isinstance(a, (PonAction, KanAction))
         ]
         if pons_kans:
-            return pons_kans[0]
+            return [pons_kans[0]]
 
         chis = [(s, a) for s, a in decisions.items() if isinstance(a, ChiAction)]
         if chis:
-            return chis[0]
+            return [chis[0]]
 
         return None
 
@@ -361,6 +433,9 @@ class RiichiRuleset:
         ctx.red_dora_count = _count_red(hand, declared) + (
             1 if (not is_tsumo and winning_tile.red) else 0
         )
+        if ctx.is_riichi:
+            ura = _peek_ura_indicators(state)
+            ctx.ura_dora_count = _count_dora_with_indicators(decomps, ura)
         yres = evaluate(decomps, ctx)
         if yres is None:
             # yakuless win — abstract game shouldn't get here, but return no-op deltas
@@ -382,6 +457,79 @@ class RiichiRuleset:
         state.attrs["mj_last_base"] = _base
         return deltas
 
+    # ---- automatic aborts --------------------------------------------------
+    def check_abort_conditions(self, state: GameState) -> str | None:
+        # 4-winds first-round discards (suufuurenta) — all 4 first discards are the same wind
+        if not state.attrs.get("mj_any_call_yet"):
+            fd = state.attrs.get("mj_first_discards", [])
+            if len(fd) == self.seats:
+                codes = {c for _, c in fd}
+                if len(codes) == 1:
+                    code = next(iter(codes))
+                    if code.startswith("z") and 1 <= int(code[1:]) <= 4:
+                        return "four_winds_first_discards"
+
+        # 4 kans by ≥2 different players (suukaikan abort; one-player 4 kans = suukantsu yakuman)
+        kan_seats: list[PlayerId] = []
+        for s, p in state.players.items():
+            for m in p.zones["melds"].items:
+                if isinstance(m, Meld) and m.meld_type in (MINKAN, ANKAN, SHOUMINKAN):
+                    kan_seats.append(s)
+        if len(kan_seats) >= 4 and len(set(kan_seats)) >= 2:
+            return "four_kans"
+
+        # all 4 players have declared riichi
+        if all(p.attrs.get("riichi") for p in state.players.values()):
+            return "four_riichis"
+
+        return None
+
+    # ---- drawn-game scoring (nagashi mangan) -------------------------------
+    def score_draw(self, state: GameState) -> dict[PlayerId, int]:
+        deltas: dict[PlayerId, int] = {s: 0 for s in range(self.seats)}
+        dealer = cast(int, state.attrs.get("mj_dealer_seat", 0))
+        nagashi_seats = []
+        for seat, p in state.players.items():
+            disc = [cast(Tile, t) for t in p.zones["discards"].items]
+            if not disc:
+                continue
+            if not all(_is_terminal_or_honor(t) for t in disc):
+                continue
+            # any opponent meld called from this seat fails nagashi
+            called = False
+            for op in state.players.values():
+                for m in op.zones["melds"].items:
+                    if isinstance(m, Meld) and m.called_from == seat:
+                        called = True
+                        break
+                if called:
+                    break
+            if called:
+                continue
+            nagashi_seats.append(seat)
+
+        # each qualifying seat is paid as a mangan-tsumo equivalent
+        for ns in nagashi_seats:
+            is_dealer_win = ns == dealer
+            if is_dealer_win:
+                # each non-dealer pays 4000 → winner +12000
+                for s in range(self.seats):
+                    if s == ns:
+                        deltas[s] += 12000
+                    else:
+                        deltas[s] -= 4000
+            else:
+                # dealer pays 4000, each non-dealer pays 2000 → winner +8000
+                for s in range(self.seats):
+                    if s == ns:
+                        deltas[s] += 8000
+                    elif s == dealer:
+                        deltas[s] -= 4000
+                    else:
+                        deltas[s] -= 2000
+        state.attrs["mj_nagashi_seats"] = list(nagashi_seats)
+        return deltas
+
     # ---- side-effect hooks --------------------------------------------------
     def apply_riichi(self, state: GameState, seat: PlayerId) -> None:
         p = state.players[seat]
@@ -389,12 +537,22 @@ class RiichiRuleset:
         p.attrs["ippatsu"] = True
         # the riichi declaration's discard should NOT immediately clear ippatsu
         p.attrs["ippatsu_skip_one"] = True
+        # double riichi: declared on the seat's first turn, no calls have happened
+        if (
+            not state.attrs.get("mj_any_call_yet", False)
+            and p.attrs.get("draw_count", 0) == 1
+        ):
+            p.attrs["double_riichi"] = True
         p.resources["points"].adjust(-1000)
         state.attrs["mj_riichi_sticks"] = state.attrs.get("mj_riichi_sticks", 0) + 1
 
     def observe(self, state: GameState, event) -> None:
         if isinstance(event, HandStarted):
             state.attrs["mj_dealer_seat"] = event.dealer
+            state.attrs["mj_any_call_yet"] = False
+            state.attrs["mj_first_discards"] = []
+            for p in state.players.values():
+                p.attrs["draw_count"] = 0
             # create dora_indicators zone if missing
             if "dora_indicators" not in state.zones:
                 state.zones["dora_indicators"] = Zone(
@@ -410,7 +568,8 @@ class RiichiRuleset:
             return
 
         if isinstance(event, MeldFormed):
-            # any meld clears ippatsu for everyone
+            # any meld clears ippatsu for everyone and kills tenhou/chiihou eligibility
+            state.attrs["mj_any_call_yet"] = True
             for p in state.players.values():
                 p.attrs["ippatsu"] = False
                 p.attrs["ippatsu_skip_one"] = False
@@ -424,6 +583,8 @@ class RiichiRuleset:
 
         if isinstance(event, TileDrawn):
             state.attrs["mj_rinshan_pending"] = event.from_dead_wall
+            p = state.players[event.seat]
+            p.attrs["draw_count"] = p.attrs.get("draw_count", 0) + 1
             return
 
         if isinstance(event, TileDiscarded):
@@ -434,6 +595,13 @@ class RiichiRuleset:
                     p.attrs["ippatsu_skip_one"] = False
                 else:
                     p.attrs["ippatsu"] = False
+            # track first round discards (for 4-winds abort)
+            if not state.attrs.get("mj_any_call_yet", False):
+                fd = state.attrs.setdefault("mj_first_discards", [])
+                if not any(s == event.seat for s, _ in fd):
+                    tile = _find_tile_anywhere(state, event.tile_id)
+                    if tile is not None:
+                        fd.append((event.seat, tile.code))
             return
 
     # ---- internal -----------------------------------------------------------
@@ -448,22 +616,46 @@ class RiichiRuleset:
         dealer = cast(int, state.attrs.get("mj_dealer_seat", 0))
         round_wind = cast(int, state.attrs.get("mj_round_wind", 1))
         p = state.players[seat]
+        is_first_turn = (
+            not state.attrs.get("mj_any_call_yet", False)
+            and p.attrs.get("draw_count", 0) == 1
+        )
         ctx = YakuContext(
             seat_wind=_seat_wind(seat, dealer, self.seats),
             round_wind=round_wind,
             is_tsumo=is_tsumo,
             is_riichi=bool(p.attrs.get("riichi")),
+            is_double_riichi=bool(p.attrs.get("double_riichi")),
             is_ippatsu=bool(p.attrs.get("ippatsu")),
             is_rinshan=is_tsumo and bool(state.attrs.get("mj_rinshan_pending")),
+            is_chankan=(not is_tsumo) and bool(state.attrs.get("mj_is_chankan_win")),
+            is_tenhou=is_tsumo and is_first_turn and seat == dealer,
+            is_chiihou=is_tsumo and is_first_turn and seat != dealer,
         )
         return ctx
 
 
-# ---- module-level helper (uses lazy import to dodge cycle issues) ---------
+# ---- module-level helpers --------------------------------------------------
 def _count_dora_for_best(decomps, ctx: YakuContext, state: GameState) -> int:
+    """Count dora across the winning hand using the currently-revealed dora indicators."""
     inds = list(state.zones.get("dora_indicators", Zone("x", Visibility.PUBLIC)).items)  # type: ignore[arg-type]
-    if not inds:
+    return _count_dora_with_indicators(decomps, cast(list[Tile], inds))
+
+
+def _count_dora_with_indicators(decomps, indicators: list[Tile]) -> int:
+    if not indicators:
         return 0
-    inds_typed = cast(list[Tile], inds)
-    # pick max across decompositions (rough — yaku.evaluate also picks best)
-    return max(_count_dora(d.groups, inds_typed) for d in decomps)
+    return max(_count_dora(d.groups, indicators) for d in decomps)
+
+
+def _peek_ura_indicators(state: GameState) -> list[Tile]:
+    """Ura-dora indicators: as many tiles from the dead wall as there are visible dora
+    indicators. Visible only to riichi winners; we 'peek' without removing them.
+    """
+    dora = state.zones.get("dora_indicators")
+    dead = state.zones.get("dead_wall")
+    if dora is None or dead is None or not dora.items or not dead.items:
+        return []
+    n = min(len(dora.items), len(dead.items))
+    # use a stable position — the deepest n tiles of dead_wall as the "ura" indicators
+    return cast(list[Tile], list(dead.items[:n]))

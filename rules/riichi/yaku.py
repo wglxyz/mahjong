@@ -348,7 +348,13 @@ def yaku_chinitsu(d, ctx):
 # Yakuman (count as 13 han equivalent; multiple yakuman stack)
 # ──────────────────────────────────────────────────────────────────────────
 def yakuman_kokushi(d, ctx):
-    return 13 if d.structure == "kokushi" else 0
+    if d.structure != "kokushi":
+        return 0
+    # 13-wait variant: the player held all 13 unique terminals/honors and the win
+    # completed the duplicate (pair). The pair group's code matches the winning tile.
+    if d.pair is not None and d.pair.tiles[0] == d.winning_tile_code:
+        return 26  # double yakuman
+    return 13
 
 
 def yakuman_suuankou(d, ctx):
@@ -441,7 +447,11 @@ def yakuman_daisuushii(d, ctx):
 
 
 def yakuman_chuuren(d, ctx):
-    """9 gates: concealed, single numeric suit, count pattern 3-1-1-1-1-1-1-1-3 + 1 extra."""
+    """9 gates: concealed, single numeric suit, count pattern 3-1-1-1-1-1-1-1-3 + 1 extra.
+
+    Pure 9-wait variant (the pre-win 13-tile hand is exactly 1112345678999) scores
+    double yakuman.
+    """
     if d.structure != "standard":
         return 0
     if not _is_concealed(d):
@@ -461,6 +471,12 @@ def yakuman_chuuren(d, ctx):
         return 0
     if any(diff < 0 for diff in diffs):
         return 0
+    # pure 9-wait: removing the winning tile yields exactly the base pattern
+    wr = int(d.winning_tile_code[1:])
+    pre = list(counts)
+    pre[wr] -= 1
+    if pre[1:10] == base[1:]:
+        return 26  # double yakuman
     return 13
 
 
@@ -536,16 +552,21 @@ def evaluate(decomps: list[Decomposition], ctx: YakuContext) -> YakuResult | Non
     """
     best: YakuResult | None = None
     for d in decomps:
-        # yakuman first
+        # yakuman first. Each yakuman fn returns 13 (single) or 26 (double); stack as multiples.
         ym_list: list[tuple[str, int]] = []
-        ym_total = 0
+        ym_multiple = 0
         for name, fn in _YAKUMAN:
             v = fn(d, ctx)
             if v:
                 ym_list.append((name, v))
-                ym_total += 1
-        if ym_total:
-            res = YakuResult(yaku=ym_list, total_han=ym_total * 13, yakuman_multiple=ym_total, decomp=d)
+                ym_multiple += v // 13
+        if ym_multiple:
+            res = YakuResult(
+                yaku=ym_list,
+                total_han=ym_multiple * 13,
+                yakuman_multiple=ym_multiple,
+                decomp=d,
+            )
             if best is None or res.total_han > best.total_han:
                 best = res
             continue

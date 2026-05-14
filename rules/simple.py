@@ -110,16 +110,16 @@ class SimpleRuleset:
 
     def resolve_response_priority(
         self, state: GameState, decisions: dict[PlayerId, Action]
-    ) -> tuple[PlayerId, Action] | None:
-        # priority: any Ron > Pon. Within Ron, lowest seat distance from discarder wins (head bump).
+    ) -> list[tuple[PlayerId, Action]] | None:
+        # SimpleRuleset is single-winner: head-bump for ron, no double-ron, no abort.
         rons = [(s, a) for s, a in decisions.items() if isinstance(a, DeclareWinAction)]
         if rons:
             d_seat = cast(PlayerId, state.attrs["mj_last_discard_seat"])
             rons.sort(key=lambda sa: (sa[0] - d_seat) % self.seats)
-            return rons[0]
+            return [rons[0]]
         pons = [(s, a) for s, a in decisions.items() if isinstance(a, PonAction)]
         if pons:
-            return pons[0]
+            return [pons[0]]
         return None
 
     # ---- win detection ----------------------------------------------------
@@ -155,6 +155,13 @@ class SimpleRuleset:
         return None
 
     def observe(self, state: GameState, event) -> None:
+        return None
+
+    def score_draw(self, state: GameState) -> dict[PlayerId, int]:
+        # SimpleRuleset has no special drawn-game payouts.
+        return {s: 0 for s in range(self.seats)}
+
+    def check_abort_conditions(self, state: GameState) -> str | None:
         return None
 
     # ---- scoring ----------------------------------------------------------

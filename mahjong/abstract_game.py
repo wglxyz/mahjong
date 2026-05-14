@@ -30,6 +30,7 @@ from core.zone import Ordering, Visibility, Zone
 
 from mahjong.actions import (
     ChiAction,
+    DeclareAbortAction,
     DeclareRiichiAction,
     DeclareWinAction,
     DiscardAction,
@@ -53,6 +54,7 @@ from mahjong.tile import Tile
 PHASE_AFTER_DRAW = "after_draw"
 PHASE_RESPONSE = "response"
 PHASE_AFTER_CALL = "after_call"
+PHASE_CHANKAN = "chankan"          # waiting for chankan ron on a shouminkan upgrade
 PHASE_END = "end"
 
 # ---- state.attrs keys ------------------------------------------------------
@@ -67,6 +69,8 @@ K_WINNING_TILE = "mj_winning_tile_id"
 K_ROUND_WIND = "mj_round_wind"
 K_HAND_NUMBER = "mj_hand_number"
 K_RULESET = "mj_ruleset"
+K_CHANKAN_SEAT = "mj_chankan_seat"
+K_CHANKAN_TILE_ID = "mj_chankan_tile_id"
 
 
 class AbstractMahjongGame:
@@ -150,6 +154,10 @@ class AbstractMahjongGame:
             d_seat = cast(PlayerId, state.attrs[K_LAST_DISCARD_SEAT])
             t_id = cast(int, state.attrs[K_LAST_DISCARD_TILE])
             return DecisionPoint(rs.legal_responses(state, d_seat, t_id))
+        if phase == PHASE_CHANKAN:
+            k_seat = cast(PlayerId, state.attrs[K_CHANKAN_SEAT])
+            t_id = cast(int, state.attrs[K_CHANKAN_TILE_ID])
+            return DecisionPoint(rs.legal_responses(state, k_seat, t_id))
         raise RuntimeError(f"unknown phase: {phase}")
 
     def apply(self, state: GameState, decisions: dict[PlayerId, Action]) -> list[Event]:
@@ -160,10 +168,28 @@ class AbstractMahjongGame:
             events = self._apply_after_call(state, decisions)
         elif phase == PHASE_RESPONSE:
             events = self._apply_response(state, decisions)
+        elif phase == PHASE_CHANKAN:
+            events = self._apply_chankan(state, decisions)
         else:
             raise RuntimeError(f"unexpected phase in apply: {phase}")
         for e in events:
             self.ruleset.observe(state, e)
+
+        # automatic abort check (4 winds, 4 kans, 4 riichi, …). Skip if hand already ended.
+        if state.attrs.get(K_PHASE) != PHASE_END:
+            reason = self.ruleset.check_abort_conditions(state)
+            if reason:
+                state.attrs[K_PHASE] = PHASE_END
+                state.attrs[K_RESULT] = "drawn"
+                state.attrs["mj_abort_reason"] = reason
+                # apply any drawn-game payouts
+                deltas = self.ruleset.score_draw(state)
+                for s, d in deltas.items():
+                    if d:
+                        state.players[s].resources["points"].adjust(d)
+                drawn = HandDrawn(tenpai_seats=())
+                events.append(drawn)
+                self.ruleset.observe(state, drawn)
         return events
 
     def is_terminal(self, state: GameState) -> bool:
@@ -193,6 +219,14 @@ class AbstractMahjongGame:
 
         if isinstance(action, KanAction):
             evs = self._do_kan_from_hand(state, seat, action)
+            if action.kind == SHOUMINKAN:
+                # opponents may chankan-ron on the added tile before we draw rinshan
+                state.attrs[K_CHANKAN_SEAT] = seat
+                state.attrs[K_CHANKAN_TILE_ID] = action.hand_tile_ids[0]
+                state.attrs[K_PHASE] = PHASE_CHANKAN
+                return evs
+            # ankan: no chankan window (with the rare exception of kokushi-chankan in some
+            # rulesets — not modelled). Draw rinshan and continue.
             drawn = self._draw_for(state, seat, from_dead_wall=True)
             evs.append(TileDrawn(seat=seat, tile_id=drawn, from_dead_wall=True))
             state.attrs[K_PHASE] = PHASE_AFTER_DRAW
@@ -205,6 +239,12 @@ class AbstractMahjongGame:
                 RiichiDeclared(seat=seat),
                 TileDiscarded(seat=seat, tile_id=action.discard_tile_id, riichi=True),
             ]
+
+        if isinstance(action, DeclareAbortAction):
+            state.attrs[K_PHASE] = PHASE_END
+            state.attrs[K_RESULT] = "drawn"
+            state.attrs["mj_abort_reason"] = action.reason
+            return [HandDrawn(tenpai_seats=())]
 
         raise RuntimeError(f"unhandled action in after_draw: {action!r}")
 
@@ -220,15 +260,24 @@ class AbstractMahjongGame:
         self, state: GameState, decisions: dict[PlayerId, Action]
     ) -> list[Event]:
         rs = self.ruleset
-        winning = rs.resolve_response_priority(state, decisions)
-        if winning is None:
+        winners = rs.resolve_response_priority(state, decisions)
+        if winners is None:
             return self._advance_to_next_draw(state)
+        if winners == []:
+            # ruleset signalled an abort (e.g. triple ron). Treat as a drawn hand.
+            state.attrs[K_PHASE] = PHASE_END
+            state.attrs[K_RESULT] = "drawn"
+            return [HandDrawn(tenpai_seats=())]
 
-        caller_seat, action = winning
         last_seat = cast(PlayerId, state.attrs[K_LAST_DISCARD_SEAT])
         last_tile_id = cast(int, state.attrs[K_LAST_DISCARD_TILE])
         called_tile = self._tile_by_id(state, last_tile_id)
 
+        # Multi-winner is only meaningful for ron. For everything else, take the first.
+        if all(isinstance(a, DeclareWinAction) and a.kind == "ron" for _, a in winners):
+            return self._do_multi_ron(state, [s for s, _ in winners], last_seat, last_tile_id)
+
+        caller_seat, action = winners[0]
         if isinstance(action, DeclareWinAction) and action.kind == "ron":
             return self._do_win(state, caller_seat, last_seat, last_tile_id)
         if isinstance(action, PonAction):
@@ -238,6 +287,89 @@ class AbstractMahjongGame:
         if isinstance(action, ChiAction):
             return self._do_call_pair(state, caller_seat, action, last_seat, called_tile, CHI)
         raise RuntimeError(f"unhandled response action: {action!r}")
+
+    def _apply_chankan(
+        self, state: GameState, decisions: dict[PlayerId, Action]
+    ) -> list[Event]:
+        rs = self.ruleset
+        kanner = cast(PlayerId, state.attrs[K_CHANKAN_SEAT])
+        added_tile_id = cast(int, state.attrs[K_CHANKAN_TILE_ID])
+        winners = rs.resolve_response_priority(state, decisions)
+
+        if winners is None or winners == []:
+            # all passed (or weird abort signal) — proceed with the rinshan draw
+            state.attrs.pop(K_CHANKAN_SEAT, None)
+            state.attrs.pop(K_CHANKAN_TILE_ID, None)
+            drawn = self._draw_for(state, kanner, from_dead_wall=True)
+            state.attrs[K_PHASE] = PHASE_AFTER_DRAW
+            return [TileDrawn(seat=kanner, tile_id=drawn, from_dead_wall=True)]
+
+        # someone ron'd the added tile — chankan win
+        state.attrs["mj_is_chankan_win"] = True
+        try:
+            if len(winners) == 1:
+                w_seat, _ = winners[0]
+                events = self._do_win(state, w_seat, kanner, added_tile_id)
+            else:
+                events = self._do_multi_ron(
+                    state, [s for s, _ in winners], kanner, added_tile_id
+                )
+        finally:
+            state.attrs.pop("mj_is_chankan_win", None)
+            state.attrs.pop(K_CHANKAN_SEAT, None)
+            state.attrs.pop(K_CHANKAN_TILE_ID, None)
+        return events
+
+    def _do_multi_ron(
+        self,
+        state: GameState,
+        winner_seats: list[PlayerId],
+        loser_seat: PlayerId,
+        winning_tile_id: int,
+    ) -> list[Event]:
+        """Each winner is scored independently against the discarder; deltas sum across
+        winners. Emits one HandWon per winner. Terminal state records the closest seat
+        as the headline winner for legacy single-winner consumers."""
+        winning_tile = self._tile_by_id(state, winning_tile_id)
+        per_winner_yaku: list[tuple[PlayerId, dict[PlayerId, int], list, int, int]] = []
+        total_deltas: dict[PlayerId, int] = {s: 0 for s in range(self.ruleset.seats)}
+
+        for winner_seat in winner_seats:
+            deltas = self.ruleset.score_win(state, winner_seat, loser_seat, winning_tile)
+            yaku_list = list(state.attrs.get("mj_last_yaku", []))
+            han = cast(int, state.attrs.get("mj_last_han", 0))
+            fu = cast(int, state.attrs.get("mj_last_fu", 0))
+            per_winner_yaku.append((winner_seat, deltas, yaku_list, han, fu))
+            for s, d in deltas.items():
+                total_deltas[s] += d
+
+        # apply the summed deltas once
+        for s, d in total_deltas.items():
+            if d:
+                state.players[s].resources["points"].adjust(d)
+
+        state.attrs[K_PHASE] = PHASE_END
+        state.attrs[K_RESULT] = "win"
+        # for legacy single-winner consumers, record the first (closest to discarder)
+        state.attrs[K_WINNER] = winner_seats[0]
+        state.attrs[K_WINNING_TILE] = winning_tile_id
+        state.attrs["mj_winners"] = list(winner_seats)
+        state.attrs["mj_winner_details"] = [
+            {"seat": s, "deltas": d, "yaku": y, "han": h, "fu": f}
+            for s, d, y, h, f in per_winner_yaku
+        ]
+
+        events: list[Event] = []
+        for winner_seat, deltas, _, _, _ in per_winner_yaku:
+            events.append(
+                HandWon(
+                    winner=winner_seat,
+                    loser=loser_seat,
+                    winning_tile_id=winning_tile_id,
+                    score=deltas.get(winner_seat, 0),
+                )
+            )
+        return events
 
     # ---- primitives -------------------------------------------------------
     def _draw_for(
@@ -385,6 +517,11 @@ class AbstractMahjongGame:
         if state.zones["wall"].is_empty():
             state.attrs[K_PHASE] = PHASE_END
             state.attrs[K_RESULT] = "drawn"
+            # let the ruleset apply any drawn-game payouts (nagashi mangan, tenpai penalty)
+            deltas = self.ruleset.score_draw(state)
+            for seat, d in deltas.items():
+                if d:
+                    state.players[seat].resources["points"].adjust(d)
             return [HandDrawn(tenpai_seats=())]
         cur = cast(PlayerId, state.attrs[K_CURRENT])
         nxt = (cur + 1) % self.ruleset.seats

@@ -64,7 +64,7 @@ Mahjong-specific primitives + the dialect-agnostic phase machine.
 |---|---|
 | `tile.py` | `Tile(Entity)` — suit (`m`/`p`/`s`/`z`/`f`) + rank + red flag |
 | `meld.py` | `Meld(Entity)` — holds a tuple of tiles, knows type and caller direction |
-| `actions.py` | Standard mahjong action types: `Discard`, `Pass`, `Chi`, `Pon`, `Kan`, `DeclareWin`, `DeclareRiichi` |
+| `actions.py` | Standard mahjong action types: `Discard`, `Pass`, `Chi`, `Pon`, `Kan`, `DeclareWin`, `DeclareRiichi`, `DeclareAbort` |
 | `events.py` | `HandStarted`, `TileDrawn`, `TileDiscarded`, `MeldFormed`, `RiichiDeclared`, `HandWon`, `HandDrawn` |
 | `ruleset.py` | `Ruleset` Protocol — what every dialect must implement |
 | `abstract_game.py` | `AbstractMahjongGame(GameDef)`: owns the phase machine, delegates every dialect-specific question (legal actions, win shape, scoring) to the Ruleset |
@@ -76,15 +76,23 @@ setup ──► AFTER_DRAW (dealer's opening draw already done)
 
 AFTER_DRAW ── Discard ──► RESPONSE
             ── DeclareWin(tsumo) ──► END
-            ── KanAction(ankan|shouminkan) ──► AFTER_DRAW (rinshan draw)
+            ── KanAction(ankan) ──► AFTER_DRAW (rinshan draw)
+            ── KanAction(shouminkan) ──► CHANKAN (opponents may ron)
             ── DeclareRiichi(+discard) ──► RESPONSE
+            ── DeclareAbort ──► END (drawn, e.g. nine-terminals)
 
 RESPONSE   ── (all Pass) ──► AFTER_DRAW for next seat (auto-draw); END if wall empty
-            ── DeclareWin(ron) ──► END
+            ── DeclareWin(ron) ──► END  (multi-winner ⇒ split payout; 3+ rons ⇒ abort)
             ── Chi/Pon ──► AFTER_CALL for caller
             ── Kan(minkan) ──► AFTER_DRAW for caller (rinshan draw)
 
+CHANKAN    ── (all Pass) ──► AFTER_DRAW for caller (rinshan draw)
+            ── DeclareWin(ron) ──► END  (chankan yaku triggers)
+
 AFTER_CALL ── Discard ──► RESPONSE
+
+After every apply: Ruleset.check_abort_conditions(state) may force END (drawn)
+when four-winds-first-discards / four-kans / four-riichi triggers.
 ```
 
 The abstract game manipulates zones (tiles between hand/discards/melds), records
@@ -96,12 +104,11 @@ look at tile content beyond moving entities around — that's the Ruleset's job.
 Each Ruleset provides:
 
 - **Constants**: `seats`, `initial_hand_size`, `dead_wall_size`
-- **Wall**: `build_wall_tiles()`, `initial_dealer()`
+- **Wall**: `build_wall_tiles`, `initial_dealer`
 - **Legal actions**: `legal_after_draw`, `legal_after_call`, `legal_responses`
-- **Resolution**: `resolve_response_priority(decisions)` — ron beats pon/kan beats chi
-- **Win check**: `is_winning_hand(tiles, melds, winning_tile, ctx)`
-- **Scoring**: `score_win(state, winner, loser, winning_tile) -> {seat: delta}`
-- **Side effects**: `apply_riichi(state, seat)` for declaration bookkeeping, `observe(state, event)` for streaming state updates (ippatsu flags, dora reveals, …)
+- **Resolution**: `resolve_response_priority(decisions) -> list | None` — list of (seat, action) winners (≥1 for multi-ron), `[]` to abort, `None` to continue
+- **Win check / scoring**: `is_winning_hand`, `score_win`, `score_draw` (drawn-game payouts like nagashi)
+- **Side-effects**: `apply_riichi`, `observe` (per-event state), `check_abort_conditions` (per-apply auto-abort check)
 
 ## L3 — rules/
 
@@ -210,7 +217,7 @@ hands appear as `hand_count` only, no `hand` field.
 | `python -m games.mahjong.play_riichi --seed N` | 4 AIs, RiichiRuleset |
 | `python -m server.server --ruleset riichi --port 8765` | WS server for Flutter client |
 
-## Tests (53 across 8 files)
+## Tests (90 across 9 files)
 
 | Suite | Coverage |
 |---|---|
@@ -221,6 +228,7 @@ hands appear as `hand_count` only, no `hand` field.
 | `test_riichi_yaku` | Each major yaku, double-wind, ron-breaks-suuankou |
 | `test_riichi_score` | Fu rounding, mangan/yakuman cap, dealer vs non-dealer payouts, zero-sum |
 | `test_riichi_engine` | Riichi engine 10+ seeds, zero-sum, win-has-yaku |
+| `test_riichi_features` | Furiten / double-riichi / tenhou-chiihou / double yakuman / dora reveals / nagashi / call scenarios / double-ron / triple-ron abort / chankan / nine-terminals / four-winds-kans-riichi aborts |
 | `test_ws_e2e` | Start server + Python WS client + auto-decide → full hand for both rulesets |
 
 ## Extending the system

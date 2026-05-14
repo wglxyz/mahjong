@@ -65,11 +65,15 @@ class Ruleset(Protocol):
 
     def resolve_response_priority(
         self, state: GameState, decisions: dict[PlayerId, Action]
-    ) -> tuple[PlayerId, Action] | None:
-        """Pick the single winning call among collected responses, or None if all passed.
+    ) -> list[tuple[PlayerId, Action]] | None:
+        """Resolve the response window. Return value:
 
-        Standard priority: Ron > Pon/Kan > Chi. Ties between rons handled per dialect
-        (head bump in HK; double ron in riichi).
+          - None: all opponents passed → continue to next draw
+          - empty list []: the response triggers an abort (e.g. triple ron in riichi)
+          - non-empty list: each tuple is a (seat, action) that "wins" the call. Usually
+            one element; double ron yields two elements (both winners get scored).
+
+        Standard priority: Ron > Pon/Kan > Chi.
         """
 
     # ---- win detection & scoring ------------------------------------------
@@ -100,3 +104,16 @@ class Ruleset(Protocol):
         """Called by AbstractMahjongGame for every event it emits, in order. Lets the
         ruleset maintain inter-action state (ippatsu eligibility, dora reveals on kan,
         etc.) without subscribing to the user-facing EventBus."""
+
+    def score_draw(self, state: GameState) -> dict[PlayerId, int]:
+        """Per-seat point deltas at a drawn game. Empty / all-zeros for dialects with
+        no special draws. Riichi uses this for nagashi mangan (and could be extended for
+        tenpai/noten penalties)."""
+
+    def check_abort_conditions(self, state: GameState) -> str | None:
+        """Called after every event apply. Return a short reason tag if the hand should
+        immediately abort (drawn), otherwise None.
+
+        Riichi: four-wind first-discards, four-kans, four-riichi, etc.
+        SimpleRuleset: never aborts.
+        """

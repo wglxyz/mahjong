@@ -14,49 +14,36 @@ documented as known simplifications in the corresponding module's docstring.
       to rerun with the same seed AND providers).
 - [ ] **Snapshot deltas**. Server currently sends a full snapshot before each
       decision. Fine for one client; a delta protocol would scale to spectators.
-- [ ] **Per-seat state views**. `core` exposes the full state; the per-seat
+- [ ] **Per-seat state views**. `core` exposes the full state; per-seat
       filtering only happens in `server/serialize.py`. If an in-process
       `ActionProvider` peeked at state, it'd see hidden info. Not a problem for
       Avid's AIs (they cheat anyway), but worth flagging.
 
 ## L2 — mahjong abstract game
 
-- [ ] **Chankan response window**. `[doc]` Currently shouminkan declarations
-      go straight to a rinshan draw; the rules permit opponents to ron on the
-      added tile. Would require teaching the abstract game a "kan declared,
-      pending response" intermediate phase.
+- [ ] **Multi-hand sessions / East round / South round**. Today a Session plays
+      one hand and stops. East round (or East+South) needs: rotate dealer (or
+      stay on dealer win), reset wall, carry over riichi sticks + honba.
 - [ ] **Per-tile riichi flag in protocol**. The riichi discard should render
-      sideways in the discard pile (and the rotated-tile detail in real
-      tile-pile rendering). The event has `riichi: bool` but `TileView` doesn't
-      carry it; a `was_riichi_discard` bit would close the gap.
-- [ ] **Multi-hand sessions**. Today a session plays one hand and stops. East
-      round (or East+South) needs: rotate dealer (or stay on dealer win), reset
-      wall, carry over riichi sticks and honba, end after configured rounds.
+      sideways in the discard pile. The event already has `riichi: bool` but
+      `TileView` doesn't carry it; a `was_riichi_discard` bit would close the
+      gap so clients can visually rotate that tile.
 
 ## L3 — riichi ruleset
 
-All listed at the top of `rules/riichi/ruleset.py` too. `[doc]`
+Most of the original simplifications are now implemented (see "Done" section
+below). What's left:
 
-- [ ] **Furiten**. A player who has previously discarded one of their winning
-      tiles cannot ron. The check itself is easy (compare winning tile to own
-      discards); plumbing the state through `ctx` is the work.
-- [ ] **Double riichi**. Declare on the very first turn with no intervening
-      calls → 2 han instead of 1. We have the flag in `YakuContext` but never
-      set it.
-- [ ] **Tenhou / chiihou**. Dealer tsumo on opening turn / non-dealer tsumo on
-      the first uninterrupted go-around. Functions exist in `yaku.py`; only
-      missing detection in `observe()`.
-- [ ] **Nagashi mangan**. All-terminal/honor discard pile at drawn game scores
-      as mangan. New event branch on `HandDrawn`.
-- [ ] **Kan dora / ura dora**. Reveals on kan declarations and on riichi wins.
-      Indicators are managed in `observe()`; ura dora needs a separate pile
-      flipped only on winners with riichi.
-- [ ] **Double ron / triple ron**. Atama-hane (head-bump, closest seat wins) is
-      what we implement; standard JPN allows double ron, with payout split.
-- [ ] **Double yakuman**. 13-wait kokushi and 9-wait chuuren are commonly
-      double yakuman. Currently flat 13-han / single yakuman.
-- [ ] **Special draws**: nine-terminals abort (kyuushuu kyuuhai), four-winds
-      restart, four-kans abort, four-riichi abort, triple-ron abort.
+- [ ] **Temporary furiten**. Right now we only model *permanent* furiten (own
+      discards contain a waiting tile). Standard riichi also has temporary
+      furiten — pass up a ron chance and you can't ron again until your next
+      own draw.
+- [ ] **Tenpai / noten penalty** at drawn game. Standard rule: at exhaustive
+      drawn game, tenpai seats split 3000 from non-tenpai seats. `score_draw`
+      already has the hook — just needs the logic + tenpai detection per seat.
+- [ ] **Kazoe yakuman vs counted yakuman option**. We treat 13+ han from
+      regular yaku as a single yakuman base (8000); some rules want it just
+      capped at sanbaiman.
 
 ## server/
 
@@ -72,6 +59,11 @@ All listed at the top of `rules/riichi/ruleset.py` too. `[doc]`
 - [ ] **Structured logging / metrics**. Today `logging.basicConfig` only.
 - [ ] **Graceful shutdown** on SIGTERM (close all WS connections, abort engine
       threads, drain outboxes).
+- [ ] **Wire new actions / events to protocol**. `DeclareAbortAction` and the
+      `mj_abort_reason` / `mj_winners` / `mj_winner_details` state fields are
+      not yet serialised to the client. The Flutter side won't see triple-ron,
+      chankan, or nine-terminals correctly until these are mapped in
+      `server/serialize.py` and `server/session.py`.
 
 ## client_flutter/
 
@@ -91,8 +83,12 @@ I couldn't run a Flutter SDK in the dev environment — every code path here is
       (scale-in). Would be nicer to fly the called tile from the discarder's
       pile to the caller's melds. Needs GlobalKey + RenderBox math + a Stack
       overlay.
-- [ ] **Furiten warning UI**. After backend supports furiten, show the player
-      a subtle "ron blocked" hint.
+- [ ] **Furiten warning UI**. Backend already blocks ron; surface this to the
+      player as "ron blocked — you've discarded a winning tile".
+- [ ] **Multi-winner (double-ron) result screen**. Win overlay currently
+      assumes a single winner — needs to render both panels stacked.
+- [ ] **Chankan / nine-terminals UI flow**. Need explicit buttons for
+      `DeclareAbortAction` and a chankan response-window indicator.
 - [ ] **Replay viewer**. Step through past hands with a scrub bar.
 - [ ] **Game settings screen**. Pick ruleset, seed, your seat before connecting.
 - [ ] **Accessibility**. No semantics labels on tiles yet.
@@ -111,16 +107,45 @@ I couldn't run a Flutter SDK in the dev environment — every code path here is
 - [ ] **`requirements.txt` / `pyproject.toml`**. Today `websockets` was
       installed manually with `pip install --break-system-packages`. Fix with
       a proper venv + lockfile.
-- [ ] **CI**. Run all 53 tests on push; check Flutter analyze + format too.
+- [ ] **CI**. Run all 90 tests on push; check Flutter analyze + format too.
 - [ ] **Linting**: ruff / mypy strict for Python, `flutter analyze` for Dart.
 - [ ] **CLAUDE.md** for project conventions if we want Claude Code to follow
       style rules (file layout, naming, no extra comments, …).
 
+---
+
+## Done (this session)
+
+Implemented and tested in `tests/test_riichi_features.py` (37 tests):
+
+- **Furiten** — permanent only; blocks ron when own discards contain a wait.
+- **Double riichi** — auto-detected when riichi declared on first turn with no calls.
+- **Tenhou** / **Chiihou** — first-turn tsumo, dealer or non-dealer.
+- **Kokushi 13-wait** double yakuman; **Chuuren 9-wait** (pure) double yakuman.
+- **Kan dora reveals** — extra indicator turned on every kan declaration.
+- **Ura dora** — peeked from dead wall only for riichi winners.
+- **Nagashi mangan** — drawn-game payout if all your discards are terminal/honor
+  and none were called.
+- **Comprehensive call coverage** — chi only from upper seat, three positions;
+  pon from any opponent; minkan / ankan / shouminkan; riichi'd players can't call.
+- **Double ron** — multiple winners share the discarder's payouts.
+- **Triple ron abort** — auto-drawn game when 3 simultaneous rons.
+- **Head-bump ordering** on double-ron (closer seat scored first).
+- **Chankan response window** — opponents may ron on a shouminkan upgrade; new
+  `PHASE_CHANKAN`; `is_chankan` yaku triggers on ron.
+- **Nine-terminals abort** — player-initiated `DeclareAbortAction`, offered on
+  first turn when 9+ unique terminal/honor codes in hand.
+- **Four-winds first-round abort** — auto-drawn when all 4 first discards
+  match the same wind.
+- **Four-riichi abort** — auto-drawn when all 4 players riichi'd.
+- **Four-kans abort** — auto-drawn when ≥4 kans across ≥2 different players
+  (single-player 4 kans remains suukantsu yakuman).
+
 ## Known soft-failures
 
-- **Random AI doesn't win often** in RiichiRuleset (yaku required); ~20 % of
-  seeds end in a win for the AI, the rest are drawn games. With a smarter AI
-  hands resolve faster and animations get exercised more.
+- **Random AI doesn't win often** in RiichiRuleset (yaku required); roughly
+  one in five seeds ends in a win for the AI, the rest are drawn games. With a
+  smarter AI hands resolve faster and animations get exercised more.
 - **`test_ws_e2e`** has a 60 s per-game timeout. On a slow CI box it could
   flake; raise the timeout or add a faster auto-pick test client.
 - **CJK rendering in SVG** depends on system fonts. Designed for `Songti SC` /

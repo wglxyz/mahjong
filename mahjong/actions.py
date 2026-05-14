@@ -54,3 +54,12 @@ class DeclareWinAction(Action):
 class DeclareRiichiAction(Action):
     """Reach declaration (riichi only). Carries the tile to discard alongside the declaration."""
     discard_tile_id: int
+
+
+@dataclass(frozen=True)
+class DeclareAbortAction(Action):
+    """Player-initiated hand abort (e.g. nine-terminals declaration in riichi).
+
+    `reason` is a short tag the ruleset interprets ('nine_terminals', …).
+    """
+    reason: str
