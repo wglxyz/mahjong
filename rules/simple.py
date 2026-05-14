@@ -164,6 +164,9 @@ class SimpleRuleset:
     def check_abort_conditions(self, state: GameState) -> str | None:
         return None
 
+    def seats_in_tenpai(self, state: GameState) -> list[PlayerId]:
+        return []
+
     # ---- scoring ----------------------------------------------------------
     def score_win(
         self,

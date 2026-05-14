@@ -457,6 +457,20 @@ class RiichiRuleset:
         state.attrs["mj_last_base"] = _base
         return deltas
 
+    # ---- tenpai inspection -------------------------------------------------
+    def seats_in_tenpai(self, state: GameState) -> list[PlayerId]:
+        out: list[PlayerId] = []
+        for seat, p in state.players.items():
+            hand = [cast(Tile, t) for t in p.zones["hand"].items]
+            declared = [cast(Meld, m) for m in p.zones["melds"].items]
+            # tenpai shape requires (4 - melds) * 3 + 1 tiles in hand (13-tile state)
+            expected = (4 - len(declared)) * 3 + 1
+            if len(hand) != expected:
+                continue
+            if _is_tenpai(hand, declared):
+                out.append(seat)
+        return out
+
     # ---- automatic aborts --------------------------------------------------
     def check_abort_conditions(self, state: GameState) -> str | None:
         # 4-winds first-round discards (suufuurenta) — all 4 first discards are the same wind

@@ -75,25 +75,38 @@ Mahjong-specific primitives + the dialect-agnostic phase machine.
 setup ──► AFTER_DRAW (dealer's opening draw already done)
 
 AFTER_DRAW ── Discard ──► RESPONSE
-            ── DeclareWin(tsumo) ──► END
+            ── DeclareWin(tsumo) ──► HAND_END
             ── KanAction(ankan) ──► AFTER_DRAW (rinshan draw)
             ── KanAction(shouminkan) ──► CHANKAN (opponents may ron)
             ── DeclareRiichi(+discard) ──► RESPONSE
-            ── DeclareAbort ──► END (drawn, e.g. nine-terminals)
+            ── DeclareAbort ──► HAND_END (drawn, e.g. nine-terminals)
 
-RESPONSE   ── (all Pass) ──► AFTER_DRAW for next seat (auto-draw); END if wall empty
-            ── DeclareWin(ron) ──► END  (multi-winner ⇒ split payout; 3+ rons ⇒ abort)
+RESPONSE   ── (all Pass) ──► AFTER_DRAW for next seat; HAND_END if wall empty
+            ── DeclareWin(ron) ──► HAND_END  (multi-winner ⇒ split payout; 3+ rons ⇒ abort)
             ── Chi/Pon ──► AFTER_CALL for caller
             ── Kan(minkan) ──► AFTER_DRAW for caller (rinshan draw)
 
 CHANKAN    ── (all Pass) ──► AFTER_DRAW for caller (rinshan draw)
-            ── DeclareWin(ron) ──► END  (chankan yaku triggers)
+            ── DeclareWin(ron) ──► HAND_END  (chankan yaku triggers)
 
 AFTER_CALL ── Discard ──► RESPONSE
 
-After every apply: Ruleset.check_abort_conditions(state) may force END (drawn)
-when four-winds-first-discards / four-kans / four-riichi triggers.
+HAND_END auto-advance (in same apply() call):
+  - record hand snapshot (winner/score/yaku) in state.attrs["mj_hand_results"]
+  - pay out the riichi-stick pool to the closest winner (kept across drawn hands)
+  - decide renchan vs rotation (dealer-win or dealer-tenpai-on-draw → renchan)
+  - if last round complete: ──► MATCH_END  (engine treats as terminal)
+  - else: deal a new hand ──► AFTER_DRAW
+
+After every apply: Ruleset.check_abort_conditions(state) may force HAND_END
+(drawn) when four-winds-first-discards / four-kans / four-riichi triggers.
 ```
+
+Match-level constructor knobs on `AbstractMahjongGame`:
+
+  - `rounds_per_match`: 1 (東風戦) or 2 (半庄戦, default — the most-played mode)
+  - `initial_points`: 25000 per seat (modern tournament standard)
+  - `tenpai_renchan`: True (drawn-game dealer-tenpai stays dealer)
 
 The abstract game manipulates zones (tiles between hand/discards/melds), records
 state via well-known keys in `state.attrs`, and emits events. It does **not**
@@ -108,6 +121,7 @@ Each Ruleset provides:
 - **Legal actions**: `legal_after_draw`, `legal_after_call`, `legal_responses`
 - **Resolution**: `resolve_response_priority(decisions) -> list | None` — list of (seat, action) winners (≥1 for multi-ron), `[]` to abort, `None` to continue
 - **Win check / scoring**: `is_winning_hand`, `score_win`, `score_draw` (drawn-game payouts like nagashi)
+- **State inspection**: `seats_in_tenpai(state) -> list[seat]` (drives dealer-tenpai renchan + future tenpai-noten penalty)
 - **Side-effects**: `apply_riichi`, `observe` (per-event state), `check_abort_conditions` (per-apply auto-abort check)
 
 ## L3 — rules/
@@ -217,18 +231,19 @@ hands appear as `hand_count` only, no `hand` field.
 | `python -m games.mahjong.play_riichi --seed N` | 4 AIs, RiichiRuleset |
 | `python -m server.server --ruleset riichi --port 8765` | WS server for Flutter client |
 
-## Tests (90 across 9 files)
+## Tests (102 across 10 files)
 
 | Suite | Coverage |
 |---|---|
 | `test_topcard` | Toy game terminates, deterministic |
 | `test_simple_ruleset` | Win-shape detection edge cases (chiitoitsu, mixed melds, …) |
-| `test_mahjong_engine` | AbstractMahjongGame + Simple across 40 seeds, zero-sum, deterministic |
+| `test_mahjong_engine` | AbstractMahjongGame + Simple across 20 seeds, points conservation, deterministic |
 | `test_riichi_decompose` | Standard / chiitoitsu / kokushi decompositions, multi-decomp hands |
 | `test_riichi_yaku` | Each major yaku, double-wind, ron-breaks-suuankou |
 | `test_riichi_score` | Fu rounding, mangan/yakuman cap, dealer vs non-dealer payouts, zero-sum |
-| `test_riichi_engine` | Riichi engine 10+ seeds, zero-sum, win-has-yaku |
+| `test_riichi_engine` | Riichi engine across seeds, points conservation (incl. stick pool), win-has-yaku |
 | `test_riichi_features` | Furiten / double-riichi / tenhou-chiihou / double yakuman / dora reveals / nagashi / call scenarios / double-ron / triple-ron abort / chankan / nine-terminals / four-winds-kans-riichi aborts |
+| `test_multi_hand` | Renchan / rotation / drawn-tenpai / round-wind advance / match end / riichi-stick payout / east-only + half-east end-to-end |
 | `test_ws_e2e` | Start server + Python WS client + auto-decide → full hand for both rulesets |
 
 ## Extending the system

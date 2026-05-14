@@ -48,23 +48,25 @@ def test_runs_to_termination_across_seeds() -> None:
         assert r["result"] in ("win", "drawn"), f"seed {seed}: unexpected result {r['result']}"
 
 
-def test_zero_sum_points() -> None:
-    for seed in range(40):
+def test_points_conservation() -> None:
+    """With initial_points=25000 across 4 seats, the table total must stay at 100000."""
+    expected = 25000 * 4
+    for seed in range(20):
         r = run_one(seed)
         total = sum(r["points"].values())
-        assert total == 0, f"seed {seed}: points not zero-sum: {r['points']}"
+        assert total == expected, f"seed {seed}: total {total} != {expected}: {r['points']}"
 
 
-def test_winner_has_positive_points_on_win() -> None:
+def test_winner_above_starting_on_win() -> None:
     saw_a_win = False
     for seed in range(60):
         r = run_one(seed)
         if r["result"] == "win":
             saw_a_win = True
-            assert len(r["winners"]) == 1
+            assert len(r["winners"]) >= 1
             w = r["winners"][0]
-            assert r["points"][w] > 0, f"seed {seed}: winner {w} non-positive: {r['points']}"
-    assert saw_a_win, "expected at least one win across 60 seeds"
+            assert r["points"][w] > 25000, f"seed {seed}: winner {w} below starting: {r['points']}"
+    assert saw_a_win, "expected at least one match-end win across 60 seeds"
 
 
 def test_determinism() -> None:

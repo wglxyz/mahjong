@@ -117,3 +117,11 @@ class Ruleset(Protocol):
         Riichi: four-wind first-discards, four-kans, four-riichi, etc.
         SimpleRuleset: never aborts.
         """
+
+    def seats_in_tenpai(self, state: GameState) -> list[PlayerId]:
+        """Which seats are currently tenpai (one tile away from a win shape).
+
+        Used by AbstractMahjongGame for the drawn-game renchan check (dealer-tenpai
+        keeps the dealer) and may feed tenpai/noten payouts. SimpleRuleset returns
+        [] since it has no tenpai concept; RiichiRuleset checks each seat's hand.
+        """

@@ -55,7 +55,8 @@ PHASE_AFTER_DRAW = "after_draw"
 PHASE_RESPONSE = "response"
 PHASE_AFTER_CALL = "after_call"
 PHASE_CHANKAN = "chankan"          # waiting for chankan ron on a shouminkan upgrade
-PHASE_END = "end"
+PHASE_HAND_END = "hand_end"        # current hand is over but match continues
+PHASE_END = "match_end"            # whole match is over (engine treats as terminal)
 
 # ---- state.attrs keys ------------------------------------------------------
 K_PHASE = "mj_phase"
@@ -71,15 +72,33 @@ K_HAND_NUMBER = "mj_hand_number"
 K_RULESET = "mj_ruleset"
 K_CHANKAN_SEAT = "mj_chankan_seat"
 K_CHANKAN_TILE_ID = "mj_chankan_tile_id"
+K_DEALER_SEAT = "mj_dealer_seat"
+K_HONBA = "mj_honba"
+K_RIICHI_STICKS_POOL = "mj_riichi_sticks"
+K_HAND_RESULTS = "mj_hand_results"
 
 
 class AbstractMahjongGame:
+    """Match orchestrator: multi-hand-aware. Common defaults match Japanese-style
+    half-east tournament play; pass constructor args to deviate.
+
+    Args:
+      ruleset             — concrete dialect implementation
+      player_names        — display names, one per seat (count must match ruleset.seats)
+      rounds_per_match    — 1=東風戦, 2=半庄戦 (default; the most-played mode)
+      initial_points      — starting score per seat (25000 is the modern standard)
+      tenpai_renchan      — drawn-game dealer-tenpai → renchan (standard true)
+    """
+
     def __init__(
         self,
         ruleset: Ruleset,
         player_names: list[str],
         round_wind: int = 1,
         hand_number: int = 1,
+        rounds_per_match: int = 2,
+        initial_points: int = 25000,
+        tenpai_renchan: bool = True,
     ) -> None:
         if len(player_names) != ruleset.seats:
             raise ValueError(
@@ -87,24 +106,57 @@ class AbstractMahjongGame:
             )
         self.ruleset = ruleset
         self.player_names = player_names
-        self.round_wind = round_wind
-        self.hand_number = hand_number
+        self.starting_round_wind = round_wind
+        self.starting_hand_number = hand_number
+        self.rounds_per_match = rounds_per_match
+        self.initial_points = initial_points
+        self.tenpai_renchan = tenpai_renchan
 
     # ---- GameDef ----------------------------------------------------------
     def setup(self, state: GameState) -> list[Event]:
         rs = self.ruleset
         state.attrs[K_RULESET] = rs
-        state.attrs[K_ROUND_WIND] = self.round_wind
-        state.attrs[K_HAND_NUMBER] = self.hand_number
+        state.attrs[K_ROUND_WIND] = self.starting_round_wind
+        state.attrs[K_HAND_NUMBER] = self.starting_hand_number
+        state.attrs[K_DEALER_SEAT] = rs.initial_dealer()
+        state.attrs[K_HONBA] = 0
+        state.attrs[K_RIICHI_STICKS_POOL] = 0
+        state.attrs[K_HAND_RESULTS] = []
 
+        # match-level state: players persist across hands with cumulative points
         for i, name in enumerate(self.player_names):
             p = Player(id=i, name=name)
             p.zones["hand"] = Zone("hand", Visibility.OWNER_ONLY, Ordering.UNORDERED, owner=i)
             p.zones["melds"] = Zone("melds", Visibility.PUBLIC, Ordering.ORDERED, owner=i)
             p.zones["discards"] = Zone("discards", Visibility.PUBLIC, Ordering.ORDERED, owner=i)
-            p.resources["points"] = Resource("points", value=0)
+            p.resources["points"] = Resource("points", value=self.initial_points)
             state.players[i] = p
 
+        state.phase = "hand"
+        return self._deal_new_hand(state)
+
+    def _deal_new_hand(self, state: GameState) -> list[Event]:
+        rs = self.ruleset
+        # clear per-hand state
+        for key in (
+            K_RESULT, K_WINNER, K_WINNING_TILE,
+            K_LAST_DRAWN_TILE, K_LAST_DISCARD_TILE, K_LAST_DISCARD_SEAT,
+            K_CHANKAN_SEAT, K_CHANKAN_TILE_ID,
+            "mj_any_call_yet", "mj_first_discards", "mj_abort_reason",
+            "mj_last_yaku", "mj_last_han", "mj_last_fu", "mj_last_base",
+            "mj_winners", "mj_winner_details", "mj_is_chankan_win",
+        ):
+            state.attrs.pop(key, None)
+
+        # clear per-hand zones and per-player flags
+        for p in state.players.values():
+            p.zones["hand"].items.clear()
+            p.zones["melds"].items.clear()
+            p.zones["discards"].items.clear()
+            # keep points; drop everything else
+            p.attrs.clear()
+
+        # rebuild wall, dead wall, dora indicators
         tiles = rs.build_wall_tiles()
         state.rng.shuffle(tiles)
         wall = Zone("wall", Visibility.HIDDEN, Ordering.ORDERED)
@@ -117,25 +169,31 @@ class AbstractMahjongGame:
             dead.push(wall.pop(0))
         state.zones["dead_wall"] = dead
 
+        if "dora_indicators" in state.zones:
+            state.zones["dora_indicators"].items.clear()
+
+        # deal initial hands
         for _ in range(rs.initial_hand_size):
             for seat in range(rs.seats):
                 state.players[seat].zones["hand"].push(wall.pop(0))
 
-        dealer = rs.initial_dealer()
+        dealer = cast(PlayerId, state.attrs[K_DEALER_SEAT])
         state.attrs[K_CURRENT] = dealer
-        state.phase = "hand"
 
-        # dealer's opening draw
         drawn = self._draw_for(state, dealer)
         state.attrs[K_PHASE] = PHASE_AFTER_DRAW
 
-        setup_events: list[Event] = [
-            HandStarted(dealer=dealer, round_wind=self.round_wind, hand_number=self.hand_number),
+        events: list[Event] = [
+            HandStarted(
+                dealer=dealer,
+                round_wind=cast(int, state.attrs[K_ROUND_WIND]),
+                hand_number=cast(int, state.attrs[K_HAND_NUMBER]),
+            ),
             TileDrawn(seat=dealer, tile_id=drawn),
         ]
-        for e in setup_events:
+        for e in events:
             rs.observe(state, e)
-        return setup_events
+        return events
 
     def decision_point(self, state: GameState) -> DecisionPoint | None:
         phase = state.attrs.get(K_PHASE)
@@ -175,11 +233,13 @@ class AbstractMahjongGame:
         for e in events:
             self.ruleset.observe(state, e)
 
+        cur_phase = state.attrs.get(K_PHASE)
+
         # automatic abort check (4 winds, 4 kans, 4 riichi, …). Skip if hand already ended.
-        if state.attrs.get(K_PHASE) != PHASE_END:
+        if cur_phase not in (PHASE_HAND_END, PHASE_END):
             reason = self.ruleset.check_abort_conditions(state)
             if reason:
-                state.attrs[K_PHASE] = PHASE_END
+                state.attrs[K_PHASE] = PHASE_HAND_END
                 state.attrs[K_RESULT] = "drawn"
                 state.attrs["mj_abort_reason"] = reason
                 # apply any drawn-game payouts
@@ -187,9 +247,17 @@ class AbstractMahjongGame:
                 for s, d in deltas.items():
                     if d:
                         state.players[s].resources["points"].adjust(d)
-                drawn = HandDrawn(tenpai_seats=())
+                drawn = HandDrawn(tenpai_seats=tuple(self.ruleset.seats_in_tenpai(state)))
                 events.append(drawn)
                 self.ruleset.observe(state, drawn)
+                cur_phase = PHASE_HAND_END
+
+        # hand → next-hand or match-end transition
+        if cur_phase == PHASE_HAND_END:
+            transition_events = self._advance_hand_or_end_match(state)
+            for e in transition_events:
+                self.ruleset.observe(state, e)
+            events.extend(transition_events)
         return events
 
     def is_terminal(self, state: GameState) -> bool:
@@ -241,7 +309,7 @@ class AbstractMahjongGame:
             ]
 
         if isinstance(action, DeclareAbortAction):
-            state.attrs[K_PHASE] = PHASE_END
+            state.attrs[K_PHASE] = PHASE_HAND_END
             state.attrs[K_RESULT] = "drawn"
             state.attrs["mj_abort_reason"] = action.reason
             return [HandDrawn(tenpai_seats=())]
@@ -265,7 +333,7 @@ class AbstractMahjongGame:
             return self._advance_to_next_draw(state)
         if winners == []:
             # ruleset signalled an abort (e.g. triple ron). Treat as a drawn hand.
-            state.attrs[K_PHASE] = PHASE_END
+            state.attrs[K_PHASE] = PHASE_HAND_END
             state.attrs[K_RESULT] = "drawn"
             return [HandDrawn(tenpai_seats=())]
 
@@ -287,6 +355,76 @@ class AbstractMahjongGame:
         if isinstance(action, ChiAction):
             return self._do_call_pair(state, caller_seat, action, last_seat, called_tile, CHI)
         raise RuntimeError(f"unhandled response action: {action!r}")
+
+    def _advance_hand_or_end_match(self, state: GameState) -> list[Event]:
+        """Decide what happens after a hand ends: deal a new hand, or terminate the match.
+
+        Also: pays out the riichi stick pool to the closest winner (kept across drawn
+        hands). Records a summary into state.attrs[K_HAND_RESULTS] before resetting.
+        """
+        rs = self.ruleset
+        dealer = cast(int, state.attrs[K_DEALER_SEAT])
+        result = cast(str, state.attrs.get(K_RESULT, "drawn"))
+        winners: list[PlayerId] = list(state.attrs.get("mj_winners") or [])
+        if not winners and state.attrs.get(K_WINNER) is not None:
+            winners = [cast(PlayerId, state.attrs[K_WINNER])]
+
+        # riichi-stick pool payout: closest winner (head-bumped) takes everything
+        pool = cast(int, state.attrs.get(K_RIICHI_STICKS_POOL, 0))
+        if result == "win" and winners and pool:
+            d_seat = cast(int, state.attrs.get(K_LAST_DISCARD_SEAT, dealer))
+            ordered = sorted(winners, key=lambda s: (s - d_seat) % rs.seats)
+            recipient = ordered[0]
+            state.players[recipient].resources["points"].adjust(pool * 1000)
+            state.attrs[K_RIICHI_STICKS_POOL] = 0
+        # drawn hand: pool carries into next hand (already tracked, do nothing)
+
+        # record per-hand result snapshot
+        hand_results = cast(list, state.attrs.setdefault(K_HAND_RESULTS, []))
+        hand_results.append({
+            "round_wind": state.attrs.get(K_ROUND_WIND),
+            "hand_number": state.attrs.get(K_HAND_NUMBER),
+            "honba": state.attrs.get(K_HONBA, 0),
+            "dealer": dealer,
+            "result": result,
+            "winners": list(winners),
+            "abort_reason": state.attrs.get("mj_abort_reason"),
+            "points_after": {s: p.resources["points"].value for s, p in state.players.items()},
+        })
+
+        # decide renchan vs rotation
+        dealer_won = dealer in winners
+        dealer_tenpai_on_draw = False
+        if result == "drawn" and self.tenpai_renchan:
+            dealer_tenpai_on_draw = dealer in rs.seats_in_tenpai(state)
+        renchan = dealer_won or dealer_tenpai_on_draw
+
+        if renchan:
+            state.attrs[K_HONBA] = cast(int, state.attrs.get(K_HONBA, 0)) + 1
+            # dealer + hand_number + round_wind unchanged
+        else:
+            # bump honba on drawn-game rotation; reset on a non-dealer win
+            if result == "drawn":
+                state.attrs[K_HONBA] = cast(int, state.attrs.get(K_HONBA, 0)) + 1
+            else:
+                state.attrs[K_HONBA] = 0
+            # rotate dealer
+            new_dealer = (dealer + 1) % rs.seats
+            state.attrs[K_DEALER_SEAT] = new_dealer
+            new_hand = cast(int, state.attrs.get(K_HAND_NUMBER, 1)) + 1
+            if new_hand > rs.seats:
+                # round complete
+                new_round = cast(int, state.attrs.get(K_ROUND_WIND, 1)) + 1
+                if new_round > self.rounds_per_match:
+                    state.attrs[K_PHASE] = PHASE_END
+                    return []
+                state.attrs[K_ROUND_WIND] = new_round
+                state.attrs[K_HAND_NUMBER] = 1
+            else:
+                state.attrs[K_HAND_NUMBER] = new_hand
+
+        # deal next hand
+        return self._deal_new_hand(state)
 
     def _apply_chankan(
         self, state: GameState, decisions: dict[PlayerId, Action]
@@ -348,7 +486,7 @@ class AbstractMahjongGame:
             if d:
                 state.players[s].resources["points"].adjust(d)
 
-        state.attrs[K_PHASE] = PHASE_END
+        state.attrs[K_PHASE] = PHASE_HAND_END
         state.attrs[K_RESULT] = "win"
         # for legacy single-winner consumers, record the first (closest to discarder)
         state.attrs[K_WINNER] = winner_seats[0]
@@ -403,7 +541,7 @@ class AbstractMahjongGame:
         deltas = rs.score_win(state, winner_seat, loser_seat, winning_tile)
         for seat, d in deltas.items():
             state.players[seat].resources["points"].adjust(d)
-        state.attrs[K_PHASE] = PHASE_END
+        state.attrs[K_PHASE] = PHASE_HAND_END
         state.attrs[K_RESULT] = "win"
         state.attrs[K_WINNER] = winner_seat
         state.attrs[K_WINNING_TILE] = winning_tile_id
@@ -515,14 +653,14 @@ class AbstractMahjongGame:
 
     def _advance_to_next_draw(self, state: GameState) -> list[Event]:
         if state.zones["wall"].is_empty():
-            state.attrs[K_PHASE] = PHASE_END
+            state.attrs[K_PHASE] = PHASE_HAND_END
             state.attrs[K_RESULT] = "drawn"
             # let the ruleset apply any drawn-game payouts (nagashi mangan, tenpai penalty)
             deltas = self.ruleset.score_draw(state)
             for seat, d in deltas.items():
                 if d:
                     state.players[seat].resources["points"].adjust(d)
-            return [HandDrawn(tenpai_seats=())]
+            return [HandDrawn(tenpai_seats=tuple(self.ruleset.seats_in_tenpai(state)))]
         cur = cast(PlayerId, state.attrs[K_CURRENT])
         nxt = (cur + 1) % self.ruleset.seats
         state.attrs[K_CURRENT] = nxt

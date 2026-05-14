@@ -32,11 +32,17 @@ def test_terminates_no_crash_across_seeds() -> None:
         assert r["result"] in ("win", "drawn"), f"seed {seed}: bad result {r['result']}"
 
 
-def test_zero_sum_points() -> None:
+def test_points_conservation() -> None:
+    """initial_points 25000 × 4 = 100000. Sticks in pool (if a hand ended drawn last)
+    may eat into this; allow the difference to be a small multiple of 1000."""
+    expected = 25000 * 4
     for seed in range(10):
         r = _run_one(seed)
         total = sum(r["points"].values())
-        assert total == 0, f"seed {seed}: not zero-sum: {r['points']} sum={total}"
+        diff = expected - total
+        assert diff % 1000 == 0 and 0 <= diff <= 10000, (
+            f"seed {seed}: lost {diff} points beyond stick pool: {r['points']}"
+        )
 
 
 def test_win_has_yaku() -> None:

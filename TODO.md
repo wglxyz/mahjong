@@ -21,13 +21,14 @@ documented as known simplifications in the corresponding module's docstring.
 
 ## L2 — mahjong abstract game
 
-- [ ] **Multi-hand sessions / East round / South round**. Today a Session plays
-      one hand and stops. East round (or East+South) needs: rotate dealer (or
-      stay on dealer win), reset wall, carry over riichi sticks + honba.
 - [ ] **Per-tile riichi flag in protocol**. The riichi discard should render
       sideways in the discard pile. The event already has `riichi: bool` but
       `TileView` doesn't carry it; a `was_riichi_discard` bit would close the
       gap so clients can visually rotate that tile.
+- [ ] **Honba bonus payouts** (本場費). Each honba adds 300 to a win payout
+      (split 100 / 100 / 100 for tsumo; 300 from discarder for ron). The honba
+      counter is tracked but the bonus isn't applied to scores yet — would
+      land in `score_win` / `_do_win`.
 
 ## L3 — riichi ruleset
 
@@ -40,7 +41,7 @@ below). What's left:
       own draw.
 - [ ] **Tenpai / noten penalty** at drawn game. Standard rule: at exhaustive
       drawn game, tenpai seats split 3000 from non-tenpai seats. `score_draw`
-      already has the hook — just needs the logic + tenpai detection per seat.
+      and `seats_in_tenpai` are both wired — just needs the payout math.
 - [ ] **Kazoe yakuman vs counted yakuman option**. We treat 13+ han from
       regular yaku as a single yakuman base (8000); some rules want it just
       capped at sanbaiman.
@@ -107,7 +108,7 @@ I couldn't run a Flutter SDK in the dev environment — every code path here is
 - [ ] **`requirements.txt` / `pyproject.toml`**. Today `websockets` was
       installed manually with `pip install --break-system-packages`. Fix with
       a proper venv + lockfile.
-- [ ] **CI**. Run all 90 tests on push; check Flutter analyze + format too.
+- [ ] **CI**. Run all 102 tests on push; check Flutter analyze + format too.
 - [ ] **Linting**: ruff / mypy strict for Python, `flutter analyze` for Dart.
 - [ ] **CLAUDE.md** for project conventions if we want Claude Code to follow
       style rules (file layout, naming, no extra comments, …).
@@ -140,6 +141,12 @@ Implemented and tested in `tests/test_riichi_features.py` (37 tests):
 - **Four-riichi abort** — auto-drawn when all 4 players riichi'd.
 - **Four-kans abort** — auto-drawn when ≥4 kans across ≥2 different players
   (single-player 4 kans remains suukantsu yakuman).
+- **Multi-hand match** — `AbstractMahjongGame` plays full East-only (1 round =
+  4 hands) or half-east (2 rounds = 8 hands) with dealer rotation, renchan on
+  dealer-win, drawn-tenpai-renchan (via `seats_in_tenpai` hook), riichi-stick
+  pool carryover, per-hand result snapshots stored in `mj_hand_results`.
+- **Match shape config** — `rounds_per_match`, `initial_points` (default 25000),
+  `tenpai_renchan` are constructor knobs on `AbstractMahjongGame`.
 
 ## Known soft-failures
 
