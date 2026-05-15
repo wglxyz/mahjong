@@ -208,10 +208,12 @@ class HandEndedMsg:
     han: int | None
     fu: int | None
     yaku: list[tuple[str, int]]
+    winners: list[int] = field(default_factory=list)   # all winners (≥1 for double-ron)
+    abort_reason: str | None = None                    # set on aborted draws
     type: str = "hand_ended"
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "type": self.type,
             "result": self.result,
             "winner": self.winner,
@@ -220,6 +222,25 @@ class HandEndedMsg:
             "han": self.han,
             "fu": self.fu,
             "yaku": [list(y) for y in self.yaku],
+            "winners": list(self.winners),
+        }
+        if self.abort_reason is not None:
+            d["abort_reason"] = self.abort_reason
+        return d
+
+
+@dataclass
+class MatchEndedMsg:
+    """Sent once after the entire match ends (all configured rounds played)."""
+    final_points: dict[int, int]
+    hand_results: list[dict]          # snapshots from state.attrs["mj_hand_results"]
+    type: str = "match_ended"
+
+    def to_dict(self) -> dict:
+        return {
+            "type": self.type,
+            "final_points": {str(k): v for k, v in self.final_points.items()},
+            "hand_results": list(self.hand_results),
         }
 
 

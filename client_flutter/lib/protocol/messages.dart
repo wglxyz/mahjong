@@ -158,6 +158,8 @@ class HandEnded {
   final int? han;
   final int? fu;
   final List<MapEntry<String, int>> yaku;
+  final List<int> winners;         // ≥1 entry for ron/tsumo (≥2 for double-ron)
+  final String? abortReason;       // set on aborted draws (nine_terminals, four_winds, ...)
   const HandEnded({
     required this.result,
     required this.winner,
@@ -166,6 +168,8 @@ class HandEnded {
     required this.han,
     required this.fu,
     required this.yaku,
+    this.winners = const [],
+    this.abortReason,
   });
   factory HandEnded.fromJson(Map<String, dynamic> j) => HandEnded(
         result: j['result'] as String,
@@ -177,6 +181,8 @@ class HandEnded {
         yaku: ((j['yaku'] as List?) ?? const [])
             .map((e) => MapEntry(e[0] as String, e[1] as int))
             .toList(),
+        winners: ((j['winners'] as List?) ?? const []).map((e) => e as int).toList(),
+        abortReason: j['abort_reason'] as String?,
       );
 }
 
@@ -190,4 +196,18 @@ class GameEvent {
     final inner = (j['event'] as Map).cast<String, dynamic>();
     return GameEvent(kind: inner['kind'] as String, data: inner);
   }
+}
+
+/// Sent once after the entire match ends (all configured rounds played).
+class MatchEnded {
+  final Map<int, int> finalPoints;
+  final List<Map<String, dynamic>> handResults;
+  const MatchEnded({required this.finalPoints, required this.handResults});
+  factory MatchEnded.fromJson(Map<String, dynamic> j) => MatchEnded(
+        finalPoints: ((j['final_points'] as Map?) ?? const {})
+            .map((k, v) => MapEntry(int.parse(k as String), v as int)),
+        handResults: ((j['hand_results'] as List?) ?? const [])
+            .map((e) => (e as Map).cast<String, dynamic>())
+            .toList(),
+      );
 }
