@@ -9,6 +9,7 @@ in asyncio. We bridge with two thread-safe primitives:
     here; the engine thread blocks in `choose()` until the event fires.
 """
 from __future__ import annotations
+
 import queue
 import threading
 from typing import Any
@@ -20,7 +21,7 @@ from server.serialize import action_views, make_snapshot
 
 
 class WebSocketProvider:
-    def __init__(self, seat: PlayerId, outbox: "queue.Queue[dict[str, Any]]") -> None:
+    def __init__(self, seat: PlayerId, outbox: queue.Queue[dict[str, Any]]) -> None:
         self.seat = seat
         # outbox shared with the rest of the session, drained by the asyncio task
         self.outbox = outbox
@@ -52,7 +53,7 @@ class WebSocketProvider:
 
         # build action views with stable ids; remember mapping
         views = action_views(legal, state)
-        self._action_id_to_action = {v.id: a for v, a in zip(views, legal)}
+        self._action_id_to_action = {v.id: a for v, a in zip(views, legal, strict=True)}
 
         # send a snapshot first so the client always has fresh state to render the prompt against
         snap = make_snapshot(state, your_seat=self.seat).to_dict()

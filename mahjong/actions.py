@@ -4,6 +4,7 @@ Tile ids reference Entity ids — that way an action can survive across shuffles
 ruleset/engine resolves them through the current zones.
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from core.action import Action

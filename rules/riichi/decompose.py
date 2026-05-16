@@ -17,12 +17,12 @@ Yaku functions only need rank/suit; entity-aware concerns (red dora) are passed
 through the winning_tile reference and a separate red-tile count.
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Iterator
+
+from collections.abc import Iterator
+from dataclasses import dataclass
 
 from mahjong.meld import ANKAN, CHI, MINKAN, PON, SHOUMINKAN, Meld
 from mahjong.tile import NUMERIC_SUITS, SUIT_Z, Tile
-
 
 # ---- group / decomposition data --------------------------------------------
 GROUP_RUN = "run"

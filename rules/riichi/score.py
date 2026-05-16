@@ -12,6 +12,7 @@ Standard table (non-dealer / dealer ron in parens):
 Payouts round up to the nearest 100 per payer.
 """
 from __future__ import annotations
+
 import math
 
 from rules.riichi.decompose import (

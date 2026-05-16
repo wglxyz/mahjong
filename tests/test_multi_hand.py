@@ -7,7 +7,6 @@ from core.event_bus import EventBus
 from core.rng import RNG
 from core.state import GameState
 from mahjong.abstract_game import (
-    AbstractMahjongGame,
     K_DEALER_SEAT,
     K_HAND_NUMBER,
     K_HAND_RESULTS,
@@ -20,6 +19,7 @@ from mahjong.abstract_game import (
     K_WINNER,
     PHASE_END,
     PHASE_HAND_END,
+    AbstractMahjongGame,
 )
 from rules.riichi.ruleset import RiichiRuleset
 
@@ -75,7 +75,7 @@ def test_drawn_dealer_tenpai_renchan() -> None:
     # mark drawn-with-dealer-tenpai by manually adjusting hand to tenpai shape
     # easiest: empty all hands except dealer's tenpai hand
     from mahjong.tile import Tile
-    for s, p in state.players.items():
+    for p in state.players.values():
         p.zones["hand"].items.clear()
     state.players[dealer].zones["hand"].items.extend([
         Tile("m", 1), Tile("m", 1), Tile("m", 1),
@@ -97,7 +97,7 @@ def test_drawn_dealer_noten_rotates() -> None:
     game, state = _new_game(rounds_per_match=1, tenpai_renchan=True)
     dealer = state.attrs[K_DEALER_SEAT]
     # dealer hand left empty → noten
-    for s, p in state.players.items():
+    for p in state.players.values():
         p.zones["hand"].items.clear()
     state.attrs[K_PHASE] = PHASE_HAND_END
     state.attrs[K_RESULT] = "drawn"

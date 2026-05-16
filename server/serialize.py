@@ -5,10 +5,11 @@ its own hand fully, but other seats' hands are only counted. Discards / melds / 
 indicators / wall count are public.
 """
 from __future__ import annotations
+
 from typing import cast
 
-from core.state import GameState
 from core.event import Event
+from core.state import GameState
 from mahjong.abstract_game import (
     K_CURRENT,
     K_HAND_NUMBER,

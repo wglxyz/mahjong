@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../protocol/messages.dart';
-import 'animated_tile.dart';
 import 'tile.dart';
 
 /// Render a single meld: tiles in a row, with the called tile rotated sideways

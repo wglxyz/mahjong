@@ -1,6 +1,7 @@
 """End-to-end: start server in-process, connect a Python client, auto-decide,
 verify the full game flows over the wire."""
 from __future__ import annotations
+
 import asyncio
 import json
 import sys

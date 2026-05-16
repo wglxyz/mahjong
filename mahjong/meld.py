@@ -10,7 +10,6 @@ from core.entity import Entity
 from core.player import PlayerId
 from mahjong.tile import Tile
 
-
 CHI = "chi"            # sequence, always called from previous-seat discard
 PON = "pon"            # triplet, called from any opponent
 MINKAN = "minkan"      # open quad, called from any opponent

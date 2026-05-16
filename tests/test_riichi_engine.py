@@ -2,13 +2,12 @@
 produces zero-sum, deterministic results."""
 from __future__ import annotations
 
-from games.mahjong.play_riichi import WinSeekingAI, run
 from core.engine import Engine
 from core.event_bus import EventBus
 from core.rng import RNG
 from core.state import GameState
-from mahjong.abstract_game import K_RESULT
-from mahjong.abstract_game import AbstractMahjongGame
+from games.mahjong.play_riichi import WinSeekingAI
+from mahjong.abstract_game import K_RESULT, AbstractMahjongGame
 from rules.riichi.ruleset import RiichiRuleset
 
 

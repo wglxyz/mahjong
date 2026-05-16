@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import random
-from typing import Sequence, TypeVar, MutableSequence
+from collections.abc import MutableSequence, Sequence
+from typing import TypeVar
 
 T = TypeVar("T")
 

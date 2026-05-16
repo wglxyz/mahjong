@@ -1,5 +1,6 @@
 """Run a single hand of Riichi mahjong with 4 random AIs."""
 from __future__ import annotations
+
 import argparse
 import random as _random
 import sys
@@ -18,7 +19,6 @@ from mahjong.actions import (
     DeclareRiichiAction,
     DeclareWinAction,
     KanAction,
-    PassAction,
     PonAction,
 )
 from mahjong.events import (

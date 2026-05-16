@@ -1,6 +1,7 @@
 """Play SimpleRuleset mahjong: you are seat E (south player visually, but called E),
 three AIs hold the other seats. Optional --seed for reproducibility."""
 from __future__ import annotations
+
 import argparse
 import random as _random
 import sys
@@ -12,7 +13,6 @@ from core.event_bus import EventBus
 from core.player import PlayerId
 from core.rng import RNG
 from core.state import GameState
-
 from mahjong.abstract_game import AbstractMahjongGame
 from mahjong.actions import DeclareWinAction, PonAction
 from rules.simple import SimpleRuleset

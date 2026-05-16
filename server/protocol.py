@@ -11,6 +11,7 @@ Direction conventions:
 All S→C messages carry `type` discriminator.
 """
 from __future__ import annotations
+
 from dataclasses import asdict, dataclass, field
 from typing import Any
 

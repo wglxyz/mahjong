@@ -7,6 +7,7 @@ Purpose: validate that the L1 abstractions can express a real (if trivial) game 
 the game module touching engine internals.
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from core.action import Action
@@ -16,7 +17,7 @@ from core.game_def import DecisionPoint
 from core.player import Player, PlayerId
 from core.resource import Resource
 from core.state import GameState
-from core.zone import Zone, Visibility, Ordering
+from core.zone import Ordering, Visibility, Zone
 
 
 class Card(Entity):

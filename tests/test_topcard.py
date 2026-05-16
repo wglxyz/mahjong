@@ -1,5 +1,6 @@
 """Smoke test: TopCard runs deterministically and reaches a valid terminal state."""
 from __future__ import annotations
+
 import random as _random
 
 from core.action import Action

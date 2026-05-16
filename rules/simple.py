@@ -10,6 +10,7 @@ Design choices:
 It is intentionally bare; the point is to verify AbstractMahjongGame wires up correctly.
 """
 from __future__ import annotations
+
 from typing import cast
 
 from core.action import Action

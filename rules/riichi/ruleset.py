@@ -24,6 +24,7 @@ Known remaining simplifications (see TODO.md for the full list):
   - Single-hand session (no East-round rotation; that lives at the Session layer)
 """
 from __future__ import annotations
+
 from typing import cast
 
 from core.action import Action
@@ -43,7 +44,6 @@ from mahjong.actions import (
 from mahjong.events import HandStarted, MeldFormed, TileDiscarded, TileDrawn
 from mahjong.meld import ANKAN, MINKAN, PON, SHOUMINKAN, Meld
 from mahjong.tile import NUMERIC_SUITS, SUIT_Z, Tile
-
 from rules.riichi.decompose import all_decompositions
 from rules.riichi.score import score as score_calc
 from rules.riichi.tileset import build_riichi_wall, dora_from_indicator
@@ -186,7 +186,7 @@ class RiichiRuleset:
             counts: dict[str, list[int]] = {}
             for t in hand:
                 counts.setdefault(t.code, []).append(t.id)
-            for code, ids in counts.items():
+            for ids in counts.values():
                 if len(ids) == 4:
                     actions.append(
                         KanAction(actor=seat, kind=ANKAN, hand_tile_ids=tuple(ids))
@@ -329,7 +329,7 @@ class RiichiRuleset:
                 r = d_tile.rank
                 suit = d_tile.suit
 
-                def has(rank: int) -> list[Tile]:
+                def has(rank: int, hand: list[Tile] = hand, suit: str = suit) -> list[Tile]:
                     return [t for t in hand if t.suit == suit and t.rank == rank]
 
                 # discard is low end (r r+1 r+2)

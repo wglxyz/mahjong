@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from mahjong.tile import Tile
-from rules.riichi.decompose import all_decompositions, KOKUSHI_TILES
+from rules.riichi.decompose import KOKUSHI_TILES, all_decompositions
 from rules.riichi.yaku import YakuContext, evaluate
 
 
@@ -123,7 +123,6 @@ def test_suuankou_concealed_tsumo() -> None:
 
 
 def test_suuankou_fails_on_ron_completing_triplet() -> None:
-    h = _tiles("m1","m1","m1","p2","p2","p2","s3","s3","s3","m9","m9","m9","p5","p5")
     # win by ron on m1 — completes the m1 triplet, no longer "concealed" for suuankou
     # need to construct: hand 13 + win = ron'd m1
     # so hand before win = remove one m1

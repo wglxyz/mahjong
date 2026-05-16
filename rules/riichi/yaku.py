@@ -10,11 +10,11 @@ Conventions:
   - Mutually-exclusive yaku (iipeiko/ryanpeikou, chanta/junchan, honitsu/chinitsu) handled in evaluate().
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from mahjong.tile import NUMERIC_SUITS, SUIT_Z
 from rules.riichi.decompose import (
-    GROUP_PAIR,
     GROUP_QUAD,
     GROUP_RUN,
     GROUP_TRIPLET,

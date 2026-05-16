@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from core.player import Player, PlayerId
-from core.zone import Zone
 from core.rng import RNG
+from core.zone import Zone
 
 
 @dataclass

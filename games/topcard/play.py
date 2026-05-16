@@ -1,5 +1,6 @@
 """Run TopCard with random AI providers and print the event log."""
 from __future__ import annotations
+
 import random as _random
 import sys
 

@@ -13,6 +13,7 @@ When real artwork arrives, replace the SVGs with the same filenames — the Flut
 client loads by code (e.g. `assets/tiles/m5.svg`) so nothing else changes.
 """
 from __future__ import annotations
+
 import os
 
 OUT = "/root/avid/client_flutter/assets/tiles"

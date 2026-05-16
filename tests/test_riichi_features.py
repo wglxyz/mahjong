@@ -5,7 +5,8 @@ Each test sets up a minimal `GameState` directly (skipping the engine) so we can
 isolate the ruleset behaviour we're testing.
 """
 from __future__ import annotations
-from typing import Iterable
+
+from collections.abc import Iterable
 
 from core.player import Player
 from core.resource import Resource
@@ -17,12 +18,10 @@ from mahjong.actions import (
     DeclareAbortAction,
     DeclareWinAction,
     KanAction,
-    PassAction,
     PonAction,
 )
-from mahjong.meld import ANKAN, MINKAN, PON, SHOUMINKAN, CHI, Meld
+from mahjong.meld import ANKAN, MINKAN, PON, SHOUMINKAN, Meld
 from mahjong.tile import Tile
-
 from rules.riichi.ruleset import RiichiRuleset
 
 
@@ -294,7 +293,8 @@ def test_chuuren_impure_is_single_yakuman() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 # Dora reveals
 # ──────────────────────────────────────────────────────────────────────────
-from mahjong.events import HandStarted as _HandStarted, MeldFormed as _MeldFormed
+from mahjong.events import HandStarted as _HandStarted
+from mahjong.events import MeldFormed as _MeldFormed
 
 
 def test_initial_dora_revealed_on_hand_started() -> None:

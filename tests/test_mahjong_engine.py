@@ -1,6 +1,7 @@
 """Smoke test: AbstractMahjongGame + SimpleRuleset never crashes across many seeds,
 points stay zero-sum, terminal state is consistent."""
 from __future__ import annotations
+
 import random as _random
 
 from core.action import Action
@@ -9,7 +10,7 @@ from core.event_bus import EventBus
 from core.player import PlayerId
 from core.rng import RNG
 from core.state import GameState
-from mahjong.abstract_game import AbstractMahjongGame, K_RESULT, K_WINNER
+from mahjong.abstract_game import K_RESULT, AbstractMahjongGame
 from mahjong.actions import DeclareWinAction, PonAction
 from rules.simple import SimpleRuleset
 

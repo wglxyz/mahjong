@@ -18,6 +18,7 @@ Phase machine:
     AFTER_CALL ── Discard ──► RESPONSE
 """
 from __future__ import annotations
+
 from typing import cast
 
 from core.action import Action
@@ -27,7 +28,6 @@ from core.player import Player, PlayerId
 from core.resource import Resource
 from core.state import GameState
 from core.zone import Ordering, Visibility, Zone
-
 from mahjong.actions import (
     ChiAction,
     DeclareAbortAction,

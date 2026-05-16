@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "avid"
+version = "0.1.0"
+description = "Layered mahjong game engine with swappable rule variants and a WebSocket-driven Flutter client"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "websockets>=12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+avid-server = "server.server:main"
+
+[tool.setuptools]
+packages = [
+    "core",
+    "mahjong",
+    "rules",
+    "rules.riichi",
+    "server",
+    "ui",
+    "games",
+    "games.mahjong",
+    "games.topcard",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# E501 (line too long) is the formatter's job; keep lint focused on real bugs.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files deliberately group imports under section banners next to the
+# tests that use them, rather than all at the top.
+"tests/**" = ["E402"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Baseline config: not strict yet. Tighten incrementally (see TODO.md "Linting").
+check_untyped_defs = true

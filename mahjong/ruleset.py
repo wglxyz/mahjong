@@ -14,6 +14,7 @@ This split keeps the abstract game ~free of dialect logic. Adding a new region's
 should mean writing one Ruleset and nothing else.
 """
 from __future__ import annotations
+
 from typing import Protocol, runtime_checkable
 
 from core.action import Action

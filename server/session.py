@@ -5,6 +5,7 @@ Game engine runs in a daemon thread. Events flow:
   WS → asyncio task → WebSocketProvider.deliver_response() → engine unblocks
 """
 from __future__ import annotations
+
 import queue
 import random as _random
 import threading
@@ -17,7 +18,7 @@ from core.event_bus import EventBus
 from core.player import PlayerId
 from core.rng import RNG
 from core.state import GameState
-from mahjong.abstract_game import AbstractMahjongGame, K_RESULT
+from mahjong.abstract_game import AbstractMahjongGame
 from mahjong.actions import (
     ChiAction,
     DeclareRiichiAction,
@@ -95,7 +96,7 @@ class Session:
         self.ruleset_name = ruleset_name
         self.human_seat = human_seat
         self.seed = seed if seed is not None else int(time.time())
-        self.outbox: "queue.Queue[dict[str, Any]]" = queue.Queue()
+        self.outbox: queue.Queue[dict[str, Any]] = queue.Queue()
         self.ws_provider = WebSocketProvider(seat=human_seat, outbox=self.outbox)
         self._build_game()
         self._engine_thread: threading.Thread | None = None

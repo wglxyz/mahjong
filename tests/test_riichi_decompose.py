@@ -1,9 +1,8 @@
 """Tests for the riichi hand-decomposition algorithm."""
 from __future__ import annotations
 
-from mahjong.tile import SUIT_M, SUIT_P, SUIT_S, SUIT_Z, Tile
+from mahjong.tile import Tile
 from rules.riichi.decompose import (
-    Decomposition,
     KOKUSHI_TILES,
     all_decompositions,
     is_winning,

@@ -8,13 +8,13 @@ Two pieces:
 Neither is mahjong-specific in its core wiring; the action-description helpers are.
 """
 from __future__ import annotations
+
 import sys
 from typing import cast
 
 from core.action import Action
 from core.player import PlayerId
 from core.state import GameState
-
 from mahjong.abstract_game import (
     K_HAND_NUMBER,
     K_LAST_DISCARD_SEAT,

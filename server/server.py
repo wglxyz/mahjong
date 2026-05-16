@@ -7,19 +7,18 @@ Each client connection gets its own Session (1 game). On disconnect the session 
 torn down. Engine runs in a background thread; this asyncio task mediates the WS.
 """
 from __future__ import annotations
+
 import argparse
 import asyncio
 import json
 import logging
 import sys
-from typing import Any
 
 import websockets
 from websockets.exceptions import ConnectionClosed
 
 from server.protocol import DecideMsg
 from server.session import Session
-
 
 log = logging.getLogger("avid.server")
 
@@ -55,7 +54,7 @@ class App:
             if outbox_task is not None:
                 try:
                     await asyncio.wait_for(outbox_task, timeout=2)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
+                except (TimeoutError, asyncio.CancelledError):
                     outbox_task.cancel()
             log.info("client disconnected: %s", peer)
 

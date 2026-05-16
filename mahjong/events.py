@@ -2,6 +2,7 @@
 rulesets can also subscribe for triggered effects (e.g. ippatsu cancellation).
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from core.event import Event

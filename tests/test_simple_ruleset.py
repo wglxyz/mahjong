@@ -1,7 +1,7 @@
 """Unit tests for SimpleRuleset's win detection — the algorithm we most want to pin down."""
 from __future__ import annotations
 
-from mahjong.tile import Tile, SUIT_M, SUIT_P, SUIT_S
+from mahjong.tile import SUIT_M, SUIT_P, SUIT_S, Tile
 from rules.simple import SimpleRuleset, _can_form_n_melds
 
 
@@ -61,7 +61,7 @@ def test_one_off_tenpai_not_win() -> None:
 def test_with_meld_uses_remaining_tiles_only() -> None:
     rs = SimpleRuleset()
     # 3 melds in hand + 1 already-declared meld (a pon-equivalent) + pair → 11 tiles in hand
-    from mahjong.meld import Meld, PON
+    from mahjong.meld import PON, Meld
     meld_tiles = (Tile(SUIT_M, 1), Tile(SUIT_M, 1), Tile(SUIT_M, 1))
     pon = Meld(PON, meld_tiles, called_from=0, called_tile_id=meld_tiles[2].id)
     h = _hand("p2","p2","p2","s3","s3","s3","m9","m9","m9","p5","p5")
