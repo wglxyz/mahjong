@@ -206,9 +206,14 @@ snapshot     { your_seat, round_wind, hand_number, dealer, wall_count,
                dora_indicators[], seats[ {seat, name, points, riichi,
                melds[], discards[], hand[]?, hand_count} ],
                current_seat, phase, last_drawn_tile? }
-event        { event: { kind: "tile_drawn"|"tile_discarded"|"meld_formed"|... } }
+event        { event: { kind: "tile_drawn"|"tile_discarded"|"meld_formed"|
+                              "hand_won"|"hand_drawn"|"riichi_declared"|... ,
+                        ...; hand_drawn carries optional abort_reason } }
 decision     { actions: [ {id, kind, tiles[]?, extra{}?} ], deadline_ms? }
-hand_ended   { result: "win"|"drawn", winner?, loser?, score, han?, fu?, yaku[] }
+                kind ∈ {discard, pass, chi, pon, kan, tsumo, ron, riichi, abort}
+hand_ended   { result: "win"|"drawn", winner?, loser?, score, han?, fu?, yaku[],
+               winners[] (≥1 for double-ron), abort_reason? }
+match_ended  { final_points: {seat: pts}, hand_results[] }   # once at end
 error        { error }
 
 C → S:
@@ -231,7 +236,7 @@ hands appear as `hand_count` only, no `hand` field.
 | `python -m games.mahjong.play_riichi --seed N` | 4 AIs, RiichiRuleset |
 | `python -m server.server --ruleset riichi --port 8765` | WS server for Flutter client |
 
-## Tests (102 across 10 files)
+## Tests (103 across 10 files)
 
 | Suite | Coverage |
 |---|---|
@@ -244,7 +249,7 @@ hands appear as `hand_count` only, no `hand` field.
 | `test_riichi_engine` | Riichi engine across seeds, points conservation (incl. stick pool), win-has-yaku |
 | `test_riichi_features` | Furiten / double-riichi / tenhou-chiihou / double yakuman / dora reveals / nagashi / call scenarios / double-ron / triple-ron abort / chankan / nine-terminals / four-winds-kans-riichi aborts |
 | `test_multi_hand` | Renchan / rotation / drawn-tenpai / round-wind advance / match end / riichi-stick payout / east-only + half-east end-to-end |
-| `test_ws_e2e` | Start server + Python WS client + auto-decide → full hand for both rulesets |
+| `test_ws_e2e` | Start server + Python WS client + auto-decide → full match for both rulesets; verifies match_ended emission, hand_ended winners[] field, points conservation |
 
 ## Extending the system
 

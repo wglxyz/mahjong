@@ -19,6 +19,7 @@ from mahjong.abstract_game import (
 )
 from mahjong.actions import (
     ChiAction,
+    DeclareAbortAction,
     DeclareRiichiAction,
     DeclareWinAction,
     DiscardAction,
@@ -163,10 +164,14 @@ def event_to_dict(event: Event, state: GameState, your_seat: int) -> dict | None
             "score": event.score,
         }
     if isinstance(event, HandDrawn):
-        return {
+        d = {
             "kind": "hand_drawn",
             "tenpai_seats": list(event.tenpai_seats),
         }
+        reason = state.attrs.get("mj_abort_reason")
+        if reason:
+            d["abort_reason"] = reason
+        return d
     return None  # unknown event type — skip
 
 
@@ -229,6 +234,10 @@ def action_views(actions: list, state: GameState) -> list[ActionView]:
                     kind="riichi",
                     tiles=[tile_view(t)] if t else [],
                 )
+            )
+        elif isinstance(a, DeclareAbortAction):
+            out.append(
+                ActionView(id=aid, kind="abort", extra={"reason": a.reason})
             )
         else:
             out.append(ActionView(id=aid, kind=f"unknown:{type(a).__name__}"))

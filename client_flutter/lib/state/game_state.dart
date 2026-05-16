@@ -18,6 +18,7 @@ class GameState extends ChangeNotifier {
   Snapshot? snapshot;
   List<ActionView>? pendingActions;
   HandEnded? handResult;
+  MatchEnded? matchResult;
 
   /// Latest event (for animations / banners). UI may consume it.
   GameEvent? lastEvent;
@@ -57,6 +58,7 @@ class GameState extends ChangeNotifier {
     snapshot = null;
     pendingActions = null;
     handResult = null;
+    matchResult = null;
     notifyListeners();
   }
 
@@ -89,6 +91,10 @@ class GameState extends ChangeNotifier {
         break;
       case 'hand_ended':
         handResult = HandEnded.fromJson(msg);
+        pendingActions = null;
+        break;
+      case 'match_ended':
+        matchResult = MatchEnded.fromJson(msg);
         pendingActions = null;
         break;
       case 'error':

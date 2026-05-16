@@ -60,11 +60,6 @@ below). What's left:
 - [ ] **Structured logging / metrics**. Today `logging.basicConfig` only.
 - [ ] **Graceful shutdown** on SIGTERM (close all WS connections, abort engine
       threads, drain outboxes).
-- [ ] **Wire new actions / events to protocol**. `DeclareAbortAction` and the
-      `mj_abort_reason` / `mj_winners` / `mj_winner_details` state fields are
-      not yet serialised to the client. The Flutter side won't see triple-ron,
-      chankan, or nine-terminals correctly until these are mapped in
-      `server/serialize.py` and `server/session.py`.
 
 ## client_flutter/
 
@@ -108,7 +103,7 @@ I couldn't run a Flutter SDK in the dev environment — every code path here is
 - [ ] **`requirements.txt` / `pyproject.toml`**. Today `websockets` was
       installed manually with `pip install --break-system-packages`. Fix with
       a proper venv + lockfile.
-- [ ] **CI**. Run all 102 tests on push; check Flutter analyze + format too.
+- [ ] **CI**. Run all 103 tests on push; check Flutter analyze + format too.
 - [ ] **Linting**: ruff / mypy strict for Python, `flutter analyze` for Dart.
 - [ ] **CLAUDE.md** for project conventions if we want Claude Code to follow
       style rules (file layout, naming, no extra comments, …).
@@ -147,6 +142,11 @@ Implemented and tested in `tests/test_riichi_features.py` (37 tests):
   pool carryover, per-hand result snapshots stored in `mj_hand_results`.
 - **Match shape config** — `rounds_per_match`, `initial_points` (default 25000),
   `tenpai_renchan` are constructor knobs on `AbstractMahjongGame`.
+- **Server protocol coverage** — `DeclareAbortAction` serialises as
+  `kind=abort`; `hand_drawn` events carry `abort_reason`; `hand_ended` carries
+  `winners[]` (≥1) for double-ron; one `match_ended` message at the end with
+  `final_points` + `hand_results[]`. Flutter `messages.dart` + `GameState`
+  updated in lockstep.
 
 ## Known soft-failures
 

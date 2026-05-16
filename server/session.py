@@ -27,7 +27,7 @@ from mahjong.actions import (
     PassAction,
     PonAction,
 )
-from server.protocol import HandEndedMsg, WelcomeMsg
+from server.protocol import HandEndedMsg, MatchEndedMsg, WelcomeMsg
 from server.serialize import event_to_dict, make_snapshot
 from server.ws_provider import WebSocketProvider
 
@@ -164,6 +164,7 @@ class Session:
         from mahjong.events import HandDrawn, HandWon
         if isinstance(e, HandWon):
             yaku = self.state.attrs.get("mj_last_yaku") or []
+            winners = list(self.state.attrs.get("mj_winners") or [e.winner])
             self.outbox.put(
                 HandEndedMsg(
                     result="win",
@@ -173,6 +174,7 @@ class Session:
                     han=self.state.attrs.get("mj_last_han"),
                     fu=self.state.attrs.get("mj_last_fu"),
                     yaku=[tuple(y) for y in yaku],
+                    winners=winners,
                 ).to_dict()
             )
         elif isinstance(e, HandDrawn):
@@ -185,6 +187,8 @@ class Session:
                     han=None,
                     fu=None,
                     yaku=[],
+                    winners=[],
+                    abort_reason=self.state.attrs.get("mj_abort_reason"),
                 ).to_dict()
             )
 
@@ -195,4 +199,16 @@ class Session:
             # most likely ws_provider closed mid-decision
             self.outbox.put({"type": "error", "error": str(exc)})
         finally:
+            # if the engine reached a clean match end, emit a summary first
+            from mahjong.abstract_game import K_PHASE, PHASE_END, K_HAND_RESULTS
+            if self.state.attrs.get(K_PHASE) == PHASE_END:
+                self.outbox.put(
+                    MatchEndedMsg(
+                        final_points={
+                            i: p.resources["points"].value
+                            for i, p in self.state.players.items()
+                        },
+                        hand_results=list(self.state.attrs.get(K_HAND_RESULTS, [])),
+                    ).to_dict()
+                )
             self.outbox.put({"type": "_end"})  # sentinel for the ws coroutine
