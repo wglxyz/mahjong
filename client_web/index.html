@@ -65,19 +65,26 @@
   .cube .dora { display: flex; gap: 3px; }
   .cube .phase { font-size: 1vh; color: var(--muted); opacity: .8; }
 
-  /* player badges (NOT rotated — readable), pinned to corners */
-  .badge { position: absolute; display: flex; flex-direction: column; gap: 1px; padding: 5px 9px; border-radius: 9px;
-           background: rgba(0,0,0,.4); border: 1px solid transparent; pointer-events: auto; transition: box-shadow .25s, border-color .25s; min-width: 78px; }
-  .badge.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset, 0 0 16px rgba(231,196,106,.45); }
-  .badge .nm { font-weight: 600; font-size: 12px; }
-  .badge.dealer .nm::after { content: " 庄"; color: var(--gold); }
-  .badge .pts { font-variant-numeric: tabular-nums; color: var(--gold); font-weight: 700; }
-  .badge .wind { color: var(--ink); font-size: 16px; }
-  .badge .riichi { color: var(--red); font-weight: bold; font-size: 11px; }
-  .badge[data-rel="0"] { left: 8px; bottom: 8px; }
-  .badge[data-rel="1"] { right: 8px; bottom: 8px; align-items: flex-end; }
-  .badge[data-rel="2"] { right: 8px; top: 8px; align-items: flex-end; }
-  .badge[data-rel="3"] { left: 8px; top: 8px; }
+  /* player plates (NOT rotated — readable), pinned to corners (Mahjong Soul style) */
+  .badge { position: absolute; display: flex; align-items: center; gap: 9px; padding: 5px 15px 5px 5px; border-radius: 999px;
+           background: linear-gradient(135deg, rgba(18,48,38,.96), rgba(9,28,22,.96)); border: 1px solid rgba(231,196,106,.22);
+           pointer-events: auto; transition: box-shadow .25s, border-color .25s; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  .badge.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), 0 0 22px rgba(231,196,106,.5); }
+  .badge .windchip { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+           font-size: 17px; font-weight: 800; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 4px rgba(0,0,0,.4); }
+  .windchip.w1 { background: radial-gradient(circle at 35% 28%, #ef7d63, #c0392b); }
+  .windchip.w2 { background: radial-gradient(circle at 35% 28%, #54bd81, #2e8b57); }
+  .windchip.w3 { background: radial-gradient(circle at 35% 28%, #62a0dd, #2f6fb0); }
+  .windchip.w4 { background: radial-gradient(circle at 35% 28%, #b095d8, #6f4fa0); }
+  .badge.dealer .windchip { box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 1px rgba(255,255,255,.3), 0 2px 4px rgba(0,0,0,.4); }
+  .badge .who { display: flex; flex-direction: column; line-height: 1.12; }
+  .badge .who .nm { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .badge .who .pts { font-size: 16px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .badge .rii { color: var(--red); font-weight: 800; font-size: 15px; }
+  .badge[data-rel="0"] { left: 10px; bottom: 10px; }
+  .badge[data-rel="1"] { right: 10px; bottom: 10px; }
+  .badge[data-rel="2"] { right: 10px; top: 10px; }
+  .badge[data-rel="3"] { left: 10px; top: 10px; }
 
   /* ── 3D tiles ── */
   .tile { --w: 24px; width: var(--w); aspect-ratio: 3 / 4; position: relative; flex: 0 0 auto;
@@ -112,13 +119,21 @@
   .badge.anim-riichi { animation: badgeFlash .85s ease-in-out 2; }
 
   /* ── action bar + burning fuse ── */
-  #actionbar { flex: 0 0 auto; min-height: 64px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 14px; background: #08271d; border-top: 1px solid #1d5b48; }
-  #actionbar .hint { color: var(--muted); }
-  button.act { background: var(--accent); color: #fff; border: none; border-radius: 9px; padding: 9px 15px; cursor: pointer; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-  button.act:hover { filter: brightness(1.13); }
-  button.act.pass { background: #5a6b64; } button.act.win { background: var(--red); } button.act.riichi { background: #c79a2e; color: #1a1a1a; }
+  #actionbar { flex: 0 0 auto; min-height: 72px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; padding: 10px 20px; background: linear-gradient(0deg, #06201a, #0a3024); border-top: 1px solid #1d5b48; }
+  #actionbar .hint { color: var(--muted); font-size: 13px; margin-right: auto; }
+  button.act { position: relative; border: none; border-radius: 999px; padding: 11px 22px; cursor: pointer; font-size: 15px; font-weight: 800; letter-spacing: 1px; color: #fff;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(180deg, #2aa17f, #16855f);
+    box-shadow: 0 4px 0 rgba(0,0,0,.32), 0 7px 14px rgba(0,0,0,.42); transition: transform .08s, filter .12s; }
+  button.act:hover { filter: brightness(1.1); }
+  button.act:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.32), 0 3px 8px rgba(0,0,0,.42); }
+  button.act.pass { background: linear-gradient(180deg, #7d8b84, #54635c); }
+  button.act.call { background: linear-gradient(180deg, #f0b052, #d2882a); color: #2a1a05; }
+  button.act.riichi { background: linear-gradient(180deg, #f4d764, #d6a92c); color: #2a1f04; }
+  button.act.win { background: linear-gradient(180deg, #ef6b6b, #c0392b); animation: winGlow 1s ease-in-out infinite; }
+  @keyframes winGlow { 0%,100% { box-shadow: 0 4px 0 rgba(0,0,0,.32), 0 0 12px rgba(232,90,90,.55); } 50% { box-shadow: 0 4px 0 rgba(0,0,0,.32), 0 0 24px rgba(232,90,90,.95); } }
   button.act .mini { display: inline-flex; gap: 3px; align-items: flex-end; }
-  button.act .mini .tile { --w: 22px; margin-bottom: 3px; }
+  button.act .mini .tile { --w: 24px; margin-bottom: 3px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
 
   .fuse-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
   .fuse-wrap .ftxt { font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -256,7 +271,11 @@ function handle(msg) {
       setTimeout(() => send({type:"request_snapshot"}), 150); break;
     case "snapshot": snap = msg; render(); break;
     case "event": applyEvent(msg.event); render(); break;
-    case "decision": pendingActions = msg.actions; renderActions(); render(); break;
+    case "decision":
+      pendingActions = msg.actions;
+      // client-side guard: nothing to decide (only 过) → skip instantly, no countdown
+      if (pendingActions.length === 1 && pendingActions[0].kind === "pass") { decide(pendingActions[0].id); break; }
+      renderActions(); render(); break;
     case "hand_ended": showHandEnd(msg); break;
     case "match_ended": showMatchEnd(msg); break;
     case "error": log("sys","ERROR: "+msg.error); break;
@@ -336,11 +355,13 @@ function renderBadge(b, sv, seatNo) {
   if (sv) prevRiichi[seatNo] = sv.riichi;
   b.innerHTML = "";
   if (!sv) return;
-  const seatWind = WINDS[((seatNo - snap.dealer + 4)%4)+1];
-  b.appendChild(elc("div","wind", seatWind + (seatNo===yourSeat?"（你）":"")));
-  b.appendChild(elc("div","nm", sv.name));
-  b.appendChild(elc("div","pts", sv.points));
-  if (sv.riichi) b.appendChild(elc("div","riichi","● 立直"));
+  const sw = ((seatNo - snap.dealer + 4)%4)+1;
+  b.appendChild(elc("div","windchip w"+sw, WINDS[sw]));
+  const who = elc("div","who");
+  who.appendChild(elc("div","nm", sv.name + (seatNo===yourSeat?"（你）":"") + (snap.dealer===seatNo?" · 庄":"")));
+  who.appendChild(elc("div","pts", sv.points));
+  b.appendChild(who);
+  if (sv.riichi) b.appendChild(elc("div","rii","立"));
 }
 
 function renderMelds(container, sv, seatNo) {
@@ -379,12 +400,12 @@ function discardActionFor(tile) { if (!pendingActions) return null;
 function renderActions() {
   const bar = document.getElementById("actionbar"); bar.innerHTML = "";
   if (!pendingActions || !pendingActions.length) { bar.innerHTML = '<span class="hint">轮到对家 / AI…</span>'; cancelTimer(); return; }
-  bar.appendChild(elc("span","hint","请出招："));
   pendingActions.forEach(a => {
     const b = elc("button","act");
     if (a.kind==="pass") b.classList.add("pass");
-    if (a.kind==="tsumo"||a.kind==="ron") b.classList.add("win");
-    if (a.kind==="riichi") b.classList.add("riichi");
+    else if (a.kind==="tsumo"||a.kind==="ron") b.classList.add("win");
+    else if (a.kind==="riichi") b.classList.add("riichi");
+    else if (a.kind==="chi"||a.kind==="pon"||a.kind==="kan") b.classList.add("call");
     let label = KIND_LABEL[a.kind] || a.kind;
     if (a.kind==="kan" && a.extra && a.extra.kan_kind) label += `(${a.extra.kan_kind})`;
     b.appendChild(document.createTextNode(label));

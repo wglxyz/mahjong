@@ -17,6 +17,7 @@ from typing import Any
 from core.action import Action
 from core.player import PlayerId
 from core.state import GameState
+from mahjong.actions import PassAction
 from server.serialize import action_views, make_snapshot
 
 
@@ -50,6 +51,12 @@ class WebSocketProvider:
     def choose(self, state: GameState, me: PlayerId, legal: list[Action]) -> Action:
         if self._closed:
             raise RuntimeError("WebSocketProvider closed before decision returned")
+
+        # Nothing to decide: a response window where the only legal action is Pass
+        # (no chi/pon/kan/ron). Auto-pass server-side so the client never sees a
+        # pointless prompt/countdown and the response phase resolves instantly.
+        if len(legal) == 1 and isinstance(legal[0], PassAction):
+            return legal[0]
 
         # build action views with stable ids; remember mapping
         views = action_views(legal, state)
