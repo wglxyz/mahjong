@@ -1,0 +1,6 @@
+Tile artwork: "Riichi Mahjong Tiles" by FluffyStuff
+Source: https://github.com/FluffyStuff/riichi-mahjong-tiles
+License: CC0 1.0 (public domain dedication)
+
+Each tile renders as the Front.svg body with a face SVG layered on top
+(see faceFile() / tileEl() in client_web/index.html).

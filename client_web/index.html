@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Avid Mahjong — Web Client</title>
+<style>
+  :root {
+    --bg: #0c3a2c; --felt: #15533f; --felt2: #103f30;
+    --ink: #f2efe6; --muted: #9fc4b4; --gold: #e7c46a;
+    --accent: #1f8a6d; --red: #d23b3b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(circle at 50% 35%, #16604a, var(--bg));
+    color: var(--ink);
+    font: 14px/1.4 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+
+  /* ── top bar ── */
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+    background: #08271d; border-bottom: 1px solid #1d5b48; flex: 0 0 auto;
+  }
+  header h1 { font-size: 15px; margin: 0; color: var(--gold); letter-spacing: .5px; }
+  header .info { color: var(--muted); font-size: 12px; }
+  header .info b { color: var(--ink); }
+  header label { color: var(--muted); font-size: 12px; user-select: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #777; }
+  .dot.on { background: #3ad07a; box-shadow: 0 0 6px #3ad07a; }
+  .dot.off { background: #d24b4b; }
+  header .spacer { flex: 1; }
+  button.ctl {
+    background: #14543f; color: var(--ink); border: 1px solid #2a7a60;
+    border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 13px;
+  }
+  button.ctl:hover { background: #1c6e51; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+  #tableWrap { flex: 1; position: relative; min-width: 0; display: flex; flex-direction: column; }
+
+  /* ── table grid ── */
+  .table {
+    flex: 1; display: grid; gap: 8px; padding: 16px; min-height: 0;
+    grid-template-columns: 1fr 1.7fr 1fr;
+    grid-template-rows: 1fr 1.5fr 1fr;
+    grid-template-areas: ".  top  ." "left center right" ".  bottom .";
+  }
+  .seat {
+    background: linear-gradient(180deg, var(--felt), var(--felt2));
+    border: 1px solid #0c3a2c; border-radius: 12px;
+    padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; min-height: 0; overflow: hidden;
+    transition: box-shadow .25s, border-color .25s;
+  }
+  .seat.s-top { grid-area: top; }
+  .seat.s-left { grid-area: left; }
+  .seat.s-right { grid-area: right; }
+  .seat.s-bottom { grid-area: bottom; }
+  .seat.active { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(231,196,106,.55) inset, 0 0 18px rgba(231,196,106,.25); }
+  .seat.dealer .nm::after { content: " 庄"; color: var(--gold); font-weight: bold; }
+
+  .seathead { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
+  .seathead .wind { font-size: 18px; color: var(--gold); width: 1.2em; text-align: center; }
+  .seathead .nm { font-weight: 600; }
+  .seathead .pts { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .seathead .riichi { color: var(--red); font-weight: bold; }
+
+  .lbl { color: var(--muted); font-size: 10px; letter-spacing: .5px; margin-top: 2px; }
+  .melds, .discards, .hand { display: flex; flex-wrap: wrap; gap: 3px; align-items: flex-start; }
+  .discards { gap: 2px; }
+  .meldgroup { display: flex; gap: 1px; padding: 2px; border-radius: 5px; background: rgba(0,0,0,.16); }
+
+  .center {
+    grid-area: center; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 8px;
+    background: radial-gradient(circle at 50% 40%, #14563f, #0d3829);
+    border: 1px solid #0c3a2c; border-radius: 14px; padding: 10px;
+  }
+  .center .round { font-size: 24px; color: var(--gold); font-weight: 700; }
+  .center .sub { color: var(--muted); font-size: 12px; }
+  .center .dora { display: flex; gap: 4px; align-items: center; }
+  .center .phase { font-size: 11px; color: var(--muted); }
+
+  /* ── tiles (FluffyStuff SVGs: face layered over Front body) ── */
+  .tile {
+    --w: 34px; width: var(--w); aspect-ratio: 3 / 4; flex: 0 0 auto;
+    background-repeat: no-repeat; background-position: center; background-size: contain;
+    border-radius: 4px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35));
+  }
+  .tile.small { --w: 26px; }
+  .hand .tile { --w: 48px; }
+  .center .dora .tile { --w: 30px; }
+  .tile.clickable { cursor: pointer; transition: transform .12s, filter .12s; }
+  .tile.clickable:hover { transform: translateY(-9px); filter: drop-shadow(0 6px 8px rgba(0,0,0,.5)); }
+  .hand .tile.drawn { margin-left: 16px; }
+
+  /* most-recent discard highlight */
+  .tile.cur-discard {
+    border-radius: 5px;
+    box-shadow: 0 0 0 2px var(--gold), 0 0 12px 2px rgba(231,196,106,.7);
+    animation: curPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes curPulse {
+    0%,100% { box-shadow: 0 0 0 2px var(--gold), 0 0 8px 1px rgba(231,196,106,.55); }
+    50%     { box-shadow: 0 0 0 2px var(--gold), 0 0 16px 4px rgba(231,196,106,.85); }
+  }
+
+  /* animations */
+  @keyframes discardIn { from { transform: translateY(-30px) scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+  .anim-discard { animation: discardIn .26s ease-out; }
+  @keyframes meldPop { 0% { transform: scale(.3) translateY(24px); opacity: 0; } 65% { transform: scale(1.12); } 100% { transform: none; opacity: 1; } }
+  .anim-meld { animation: meldPop .4s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes drawBounce { 0% { transform: translateY(-22px); opacity: .2; } 60% { transform: translateY(5px); } 100% { transform: none; } }
+  .anim-draw { animation: drawBounce .45s ease-out; }
+  @keyframes riichiFlash { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 0 3px rgba(210,59,59,.7) inset; } }
+  .seat.anim-riichi { animation: riichiFlash .8s ease-in-out 2; }
+
+  /* ── action bar + burning fuse ── */
+  #actionbar {
+    flex: 0 0 auto; min-height: 64px; display: flex; flex-wrap: wrap; gap: 10px;
+    align-items: center; padding: 10px 14px; background: #08271d; border-top: 1px solid #1d5b48;
+  }
+  #actionbar .hint { color: var(--muted); }
+  button.act {
+    background: var(--accent); color: #fff; border: none; border-radius: 9px;
+    padding: 9px 15px; cursor: pointer; font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  button.act:hover { filter: brightness(1.13); }
+  button.act.pass { background: #5a6b64; }
+  button.act.win { background: var(--red); }
+  button.act.riichi { background: #c79a2e; color: #1a1a1a; }
+  button.act .mini { display: inline-flex; gap: 2px; }
+
+  .fuse-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .fuse-wrap .ftxt { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .fuse-wrap .secs { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gold); width: 2.4em; text-align: right; }
+  .fuse {
+    position: relative; width: 260px; height: 16px; border-radius: 8px; overflow: visible;
+    background: repeating-linear-gradient(90deg, #b9863a 0 7px, #caa45a 7px 14px);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);
+  }
+  .fuse .char { position: absolute; top: 0; right: 0; bottom: 0; width: 0%;
+    background: linear-gradient(90deg, #1a130c, #2a2018); border-radius: 0 8px 8px 0; }
+  .fuse .flame { position: absolute; top: -10px; font-size: 20px; transform: translateX(-50%);
+    filter: drop-shadow(0 0 4px #ff9b2e); pointer-events: none; }
+
+  /* ── log panel ── */
+  #logpanel { width: 360px; flex: 0 0 auto; background: #07211a; border-left: 1px solid #1d5b48; display: flex; flex-direction: column; min-height: 0; }
+  #logpanel.hidden { display: none; }
+  #logpanel .loghead { padding: 8px 12px; border-bottom: 1px solid #1d5b48; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  #log { flex: 1; overflow-y: auto; padding: 6px 10px; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #log .row { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); white-space: pre-wrap; word-break: break-word; }
+  #log .in { color: #7fd6ff; } #log .out { color: #ffd479; } #log .sys { color: #8aa; }
+  #log .tag { opacity: .7; }
+
+  /* ── overlay ── */
+  #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); z-index: 20; }
+  #overlay.show { display: flex; }
+  .card { background: #0f4536; border: 1px solid var(--gold); border-radius: 16px; padding: 22px 30px; min-width: 290px; max-width: 460px; text-align: center; box-shadow: 0 12px 48px rgba(0,0,0,.55); animation: cardIn .35s cubic-bezier(.2,1.3,.4,1); }
+  @keyframes cardIn { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+  .card h2 { margin: 0 0 8px; color: var(--gold); }
+  .card .yaku { text-align: left; margin: 12px 0; }
+  .card .yaku div { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.08); padding: 3px 0; }
+  .card .big { font-size: 32px; color: var(--ink); margin: 10px 0; font-variant-numeric: tabular-nums; }
+  .card table { width: 100%; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  .card td { padding: 2px 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🀄 Avid Mahjong</h1>
+  <span class="dot off" id="conndot"></span>
+  <span class="info" id="conninfo">未连接</span>
+  <span class="info" id="gameinfo"></span>
+  <span class="spacer"></span>
+  <label><input type="checkbox" id="timerOn" checked> 限时</label>
+  <button class="ctl" id="snapBtn" title="向服务器请求一次完整快照">刷新</button>
+  <button class="ctl" id="reconnectBtn">重连</button>
+  <button class="ctl" id="logBtn">隐藏日志</button>
+</header>
+
+<main>
+  <div id="tableWrap">
+    <div class="table" id="table">
+      <div class="seat s-top"    data-rel="2"></div>
+      <div class="seat s-left"   data-rel="3"></div>
+      <div class="center" id="center"></div>
+      <div class="seat s-right"  data-rel="1"></div>
+      <div class="seat s-bottom" data-rel="0"></div>
+    </div>
+    <div id="actionbar"><span class="hint">等待连接…</span></div>
+    <div id="overlay"><div class="card" id="overlayCard"></div></div>
+  </div>
+
+  <div id="logpanel">
+    <div class="loghead">
+      <b>协议日志</b>
+      <span style="flex:1"></span>
+      <label><input type="checkbox" id="logEvents" checked> events</label>
+      <button class="ctl" id="clearLog" style="padding:2px 8px">清空</button>
+    </div>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+// ── timing knobs (ms) ──
+const RESPONSE_MS = 5000;   // 吃/碰/杠/荣和 等响应窗口：5 秒
+const TURN_MS     = 10000;  // 自家出牌：10 秒
+
+// ── constants ──
+const WINDS = ["", "東", "南", "西", "北"];
+const FACE = {
+  m: ["", "Man1","Man2","Man3","Man4","Man5","Man6","Man7","Man8","Man9"],
+  p: ["", "Pin1","Pin2","Pin3","Pin4","Pin5","Pin6","Pin7","Pin8","Pin9"],
+  s: ["", "Sou1","Sou2","Sou3","Sou4","Sou5","Sou6","Sou7","Sou8","Sou9"],
+  z: ["", "Ton","Nan","Shaa","Pei","Haku","Hatsu","Chun"],
+};
+const RED_FACE = { m: "Man5-Dora", p: "Pin5-Dora", s: "Sou5-Dora" };
+const ABORT_NAMES = {
+  nine_terminals: "九種九牌", four_winds: "四風連打", four_kans: "四開槓",
+  four_riichi: "四家立直", triple_ron: "三家和了", wall_empty: "荒牌流局",
+};
+const KIND_LABEL = { discard:"切", pass:"过", chi:"吃", pon:"碰", kan:"杠", tsumo:"自摸", ron:"荣和", riichi:"立直", abort:"流局" };
+
+// ── state ──
+let ws = null, yourSeat = 0, seatNames = ["E","S","W","N"], ruleset = "?";
+let snap = null, pendingActions = null;
+let globalLastDiscard = null;                 // {seat, id} — the tile currently "in play"
+const seenDiscardIds = new Set();
+const seenMeldKeys = new Set();
+const animatedDrawIds = new Set();
+let prevRiichi = {};                          // seat -> bool, to flash on new riichi
+
+// ── logging ──
+const logEl = document.getElementById("log");
+function log(dir, obj) {
+  if (dir === "in" && obj && obj.type === "event" && !document.getElementById("logEvents").checked) return;
+  const row = document.createElement("div");
+  row.className = "row " + dir;
+  const t = new Date().toLocaleTimeString("en-GB");
+  const arrow = dir === "in" ? "← " : dir === "out" ? "→ " : "  ";
+  row.innerHTML = `<span class="tag">${t} ${arrow}</span>${escapeHtml(typeof obj==="string"?obj:JSON.stringify(obj))}`;
+  logEl.appendChild(row); logEl.scrollTop = logEl.scrollHeight;
+  while (logEl.children.length > 600) logEl.removeChild(logEl.firstChild);
+}
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+// ── connection ──
+function wsUrl() { return (location.protocol==="https:"?"wss:":"ws:") + "//" + location.host + "/"; }
+function connect() {
+  if (ws && (ws.readyState===WebSocket.OPEN || ws.readyState===WebSocket.CONNECTING)) return;
+  const url = wsUrl(); setConn(false, "连接中… "+url); log("sys","connecting "+url);
+  ws = new WebSocket(url);
+  ws.onopen = () => { setConn(true, "已连接 "+url); log("sys","open"); };
+  ws.onclose = (e) => { setConn(false, "已断开 (code "+e.code+")"); log("sys","close "+e.code); cancelTimer(); };
+  ws.onerror = () => log("sys","error");
+  ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { log("sys","bad json"); return; } log("in",m); handle(m); };
+}
+function send(obj) { if (ws && ws.readyState===WebSocket.OPEN) { ws.send(JSON.stringify(obj)); log("out",obj); } }
+function setConn(on, txt) { document.getElementById("conndot").className = "dot "+(on?"on":"off"); document.getElementById("conninfo").textContent = txt; }
+
+// ── message handling ──
+function handle(msg) {
+  switch (msg.type) {
+    case "welcome":
+      yourSeat = msg.your_seat; seatNames = msg.seats; ruleset = msg.ruleset;
+      seenDiscardIds.clear(); seenMeldKeys.clear(); animatedDrawIds.clear(); globalLastDiscard = null; prevRiichi = {};
+      setTimeout(() => send({type:"request_snapshot"}), 150);
+      break;
+    case "snapshot": snap = msg; render(); break;
+    case "event": applyEvent(msg.event); render(); break;
+    case "decision": pendingActions = msg.actions; renderActions(); break;
+    case "hand_ended": showHandEnd(msg); break;
+    case "match_ended": showMatchEnd(msg); break;
+    case "error": log("sys","ERROR: "+msg.error); break;
+  }
+}
+
+// incremental update so the board stays live between snapshots
+function applyEvent(e) {
+  if (!snap) return;
+  const seat = (s) => snap.seats.find(x => x.seat === s);
+  switch (e.kind) {
+    case "hand_started":
+      snap.dealer = e.dealer; snap.round_wind = e.round_wind; snap.hand_number = e.hand_number;
+      globalLastDiscard = null; break;
+    case "tile_drawn": {
+      const s = seat(e.seat); if (!s) break;
+      s.hand_count = (s.hand_count||0) + 1; snap.current_seat = e.seat;
+      if (e.tile && e.seat === yourSeat) { (s.hand=s.hand||[]).push(e.tile); snap.last_drawn_tile = e.tile; }
+      break;
+    }
+    case "tile_discarded": {
+      const s = seat(e.seat); if (!s) break;
+      if (e.tile) { (s.discards=s.discards||[]).push(e.tile); globalLastDiscard = {seat:e.seat, id:e.tile.id}; }
+      if (e.seat === yourSeat && e.tile && s.hand) {
+        const i = s.hand.findIndex(t => t.id === e.tile.id);
+        if (i >= 0) s.hand.splice(i,1); snap.last_drawn_tile = null;
+      } else { s.hand_count = Math.max(0,(s.hand_count||1)-1); }
+      if (e.riichi) s.riichi = true;
+      break;
+    }
+    case "riichi_declared": { const s = seat(e.seat); if (s) s.riichi = true; break; }
+    case "meld_formed": {
+      const s = seat(e.seat); if (!s) break;
+      (s.melds=s.melds||[]).push({meld_type:e.meld_type, tiles:e.tiles||[], called_from:e.called_from});
+      globalLastDiscard = null;  // called tile no longer "in play"
+      break;
+    }
+  }
+}
+
+// ── tiles ──
+function faceFile(t) {
+  const suit = t.code[0], rank = +t.code.slice(1);
+  if (t.red && RED_FACE[suit]) return RED_FACE[suit];
+  return (FACE[suit] || [])[rank] || "Front";
+}
+function tileEl(t, opts = {}) {
+  const d = document.createElement("div");
+  d.className = "tile" + (opts.small?" small":"");
+  if (!t) { d.style.backgroundImage = "url(/tiles/Back.svg)"; return d; }
+  d.style.backgroundImage = `url(/tiles/${faceFile(t)}.svg), url(/tiles/Front.svg)`;
+  if (opts.drawn) d.classList.add("drawn");
+  if (opts.animDraw) d.classList.add("anim-draw");
+  if (opts.animDiscard) d.classList.add("anim-discard");
+  if (opts.cur) d.classList.add("cur-discard");
+  if (opts.clickable) { d.classList.add("clickable"); d.onclick = opts.onclick; }
+  return d;
+}
+
+// ── rendering ──
+function render() {
+  if (!snap) return;
+  document.getElementById("gameinfo").innerHTML =
+    `规则 <b>${ruleset}</b> · 你 <b>${WINDS[yourSeat+1]||yourSeat}</b> · ${WINDS[snap.round_wind]||""}${snap.hand_number}局 · 余牌 <b>${snap.wall_count}</b>`;
+
+  const c = document.getElementById("center"); c.innerHTML = "";
+  const round = el("div","round", `${WINDS[snap.round_wind]||"?"} ${snap.hand_number}`);
+  const sub = el("div","sub", `庄家 ${WINDS[snap.dealer+1]||snap.dealer} · 余 ${snap.wall_count} 张`);
+  const doraLbl = el("div","phase","宝牌指示");
+  const dora = el("div","dora"); (snap.dora_indicators||[]).forEach(t => dora.appendChild(tileEl(t,{small:true})));
+  const curSeat = snap.current_seat;
+  const curLabel = (curSeat==null) ? "-" : (WINDS[curSeat+1]||curSeat);
+  const phase = el("div","phase", "phase: "+(snap.phase||"-")+" · 当前 "+curLabel);
+  c.append(round, sub, doraLbl, dora, phase);
+
+  document.querySelectorAll(".seat").forEach(div => {
+    const rel = +div.dataset.rel;
+    const seatNo = ((yourSeat + rel) % 4 + 4) % 4;
+    renderSeat(div, snap.seats.find(s => s.seat === seatNo), seatNo);
+  });
+}
+function el(tag, cls, txt) { const d = document.createElement(tag); if (cls) d.className = cls; if (txt!=null) d.textContent = txt; return d; }
+
+function renderSeat(div, sv, seatNo) {
+  div.classList.toggle("active", snap.current_seat === seatNo);
+  div.classList.toggle("dealer", snap.dealer === seatNo);
+  // flash on newly-declared riichi
+  if (sv && sv.riichi && !prevRiichi[seatNo]) { div.classList.remove("anim-riichi"); void div.offsetWidth; div.classList.add("anim-riichi"); }
+  if (sv) prevRiichi[seatNo] = sv.riichi;
+  div.innerHTML = "";
+  if (!sv) return;
+
+  const head = el("div","seathead");
+  head.appendChild(el("span","wind", WINDS[((seatNo - snap.dealer + 4) % 4) + 1]));
+  head.appendChild(el("span","nm", sv.name + (seatNo===yourSeat?"（你）":"")));
+  head.appendChild(el("span","pts", sv.points));
+  if (sv.riichi) head.appendChild(el("span","riichi","● 立直"));
+  div.appendChild(head);
+
+  if (sv.melds && sv.melds.length) {
+    const m = el("div","melds");
+    sv.melds.forEach(meld => {
+      const key = seatNo + ":" + ((meld.tiles||[])[0]||{}).id;
+      const fresh = !seenMeldKeys.has(key); if (fresh) seenMeldKeys.add(key);
+      const g = el("div","meldgroup"); if (fresh) g.classList.add("anim-meld");
+      (meld.tiles||[]).forEach(t => g.appendChild(tileEl(t,{small:true})));
+      m.appendChild(g);
+    });
+    div.appendChild(m);
+  }
+
+  div.appendChild(el("div","lbl","手牌"));
+  const hand = el("div","hand");
+  if (sv.hand) {
+    const drawnId = snap.last_drawn_tile ? snap.last_drawn_tile.id : null;
+    sortHand(sv.hand).forEach(t => {
+      const isDrawn = t.id === drawnId;
+      const animDraw = isDrawn && !animatedDrawIds.has(t.id);
+      if (animDraw) animatedDrawIds.add(t.id);
+      hand.appendChild(tileEl(t, { drawn:isDrawn, animDraw, clickable: !!discardActionFor(t), onclick: () => clickHandTile(t) }));
+    });
+  } else {
+    for (let i=0;i<(sv.hand_count||0);i++) hand.appendChild(tileEl(null,{small:true}));
+  }
+  div.appendChild(hand);
+
+  div.appendChild(el("div","lbl","牌河"));
+  const d = el("div","discards");
+  (sv.discards||[]).forEach(t => {
+    const fresh = !seenDiscardIds.has(t.id); if (fresh) seenDiscardIds.add(t.id);
+    const isCur = globalLastDiscard && globalLastDiscard.seat===seatNo && globalLastDiscard.id===t.id;
+    d.appendChild(tileEl(t,{small:true, animDiscard:fresh, cur:isCur}));
+  });
+  div.appendChild(d);
+}
+function sortHand(hand) {
+  const order = {m:0,p:1,s:2,z:3};
+  return [...hand].sort((a,b)=>{ const sa=order[a.code[0]], sb=order[b.code[0]]; return sa!==sb?sa-sb:(+a.code.slice(1))-(+b.code.slice(1)); });
+}
+
+// ── actions ──
+function discardActionFor(tile) {
+  if (!pendingActions) return null;
+  return pendingActions.find(a => (a.kind==="discard"||a.kind==="riichi") && a.tiles && a.tiles.some(t => t.id===tile.id));
+}
+function clickHandTile(tile) { const a = discardActionFor(tile); if (a) decide(a.id); }
+
+function renderActions() {
+  const bar = document.getElementById("actionbar"); bar.innerHTML = "";
+  if (!pendingActions || !pendingActions.length) { bar.innerHTML = '<span class="hint">轮到对家 / AI…</span>'; cancelTimer(); return; }
+
+  bar.appendChild(el("span","hint","请出招："));
+  pendingActions.forEach(a => {
+    const b = el("button","act");
+    if (a.kind==="pass") b.classList.add("pass");
+    if (a.kind==="tsumo"||a.kind==="ron") b.classList.add("win");
+    if (a.kind==="riichi") b.classList.add("riichi");
+    let label = KIND_LABEL[a.kind] || a.kind;
+    if (a.kind==="kan" && a.extra && a.extra.kan_kind) label += `(${a.extra.kan_kind})`;
+    b.appendChild(document.createTextNode(label));
+    if (a.tiles && a.tiles.length) { const mini = el("span","mini"); a.tiles.forEach(t => mini.appendChild(tileEl(t,{small:true}))); b.appendChild(mini); }
+    b.onclick = () => decide(a.id);
+    bar.appendChild(b);
+  });
+
+  startTimerForDecision(bar);
+}
+
+function decide(actionId) {
+  cancelTimer();
+  send({type:"decide", action_id: actionId});
+  pendingActions = null;
+  document.getElementById("actionbar").innerHTML = '<span class="hint">已出招，等待…</span>';
+}
+
+// ── burning-fuse countdown ──
+let fuseRAF = null;
+function cancelTimer() { if (fuseRAF) { cancelAnimationFrame(fuseRAF); fuseRAF = null; } }
+function startTimerForDecision(bar) {
+  cancelTimer();
+  if (!document.getElementById("timerOn").checked) return;
+  const isResponse = pendingActions.some(a => a.kind === "pass");
+  const durMs = isResponse ? RESPONSE_MS : TURN_MS;
+  const onExpire = () => {
+    if (!pendingActions) return;
+    let pick;
+    if (isResponse) { pick = pendingActions.find(a => a.kind==="pass"); }
+    else { const ds = pendingActions.filter(a => a.kind==="discard"); pick = ds.length ? ds[Math.floor(Math.random()*ds.length)] : pendingActions[0]; }
+    if (pick) decide(pick.id);
+  };
+
+  // build fuse UI
+  const wrap = el("div","fuse-wrap");
+  wrap.appendChild(el("span","ftxt", isResponse ? "吃/碰/杠/和（超时自动过）" : "出牌（超时随机打）"));
+  const fuse = el("div","fuse");
+  const char = el("div","char"); const flame = el("span","flame"); flame.textContent = "🔥";
+  fuse.append(char, flame); wrap.appendChild(fuse);
+  const secs = el("span","secs"); wrap.appendChild(secs);
+  bar.appendChild(wrap);
+
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min(1, (now - start) / durMs);
+    char.style.width = (p*100) + "%";
+    flame.style.left = ((1-p)*100) + "%";
+    secs.textContent = (Math.max(0,(1-p)*durMs)/1000).toFixed(1) + "s";
+    if (p >= 1) { fuseRAF = null; onExpire(); return; }
+    fuseRAF = requestAnimationFrame(tick);
+  }
+  fuseRAF = requestAnimationFrame(tick);
+}
+
+// ── overlays ──
+let overlayTimer = null;
+function showHandEnd(m) {
+  const card = document.getElementById("overlayCard");
+  if (m.result === "drawn") {
+    const reason = m.abort_reason ? (ABORT_NAMES[m.abort_reason]||m.abort_reason) : "荒牌流局";
+    card.innerHTML = `<h2>流局</h2><div class="sub">${reason}</div>`;
+  } else {
+    const who = (m.winners&&m.winners.length?m.winners:[m.winner]).map(s=>seatNames[s]||s).join("、");
+    const via = m.loser!=null ? `荣和（放铳：${seatNames[m.loser]||m.loser}）` : "自摸";
+    let yakuHtml = "";
+    if (m.yaku && m.yaku.length) yakuHtml = '<div class="yaku">' + m.yaku.map(y=>`<div><span>${y[0]}</span><span>${y[1]}番</span></div>`).join("") + "</div>";
+    const hf = (m.han!=null) ? `${m.han}番 ${m.fu?m.fu+"符":""}` : "";
+    card.innerHTML = `<h2>${who} 和了</h2><div class="sub">${via} · ${hf}</div>${yakuHtml}<div class="big">${m.score} 点</div>`;
+  }
+  showOverlay(2800);
+}
+function showMatchEnd(m) {
+  const card = document.getElementById("overlayCard");
+  const rows = Object.entries(m.final_points).sort((a,b)=>b[1]-a[1])
+    .map(([s,p],i)=>`<tr><td>${i+1}位</td><td>${seatNames[s]||s}</td><td style="text-align:right">${p}</td></tr>`).join("");
+  card.innerHTML = `<h2>对局结束</h2><table>${rows}</table><div class="sub" style="margin-top:10px">共 ${m.hand_results.length} 局</div><button class="ctl" style="margin-top:12px" onclick="hideOverlay()">关闭</button>`;
+  showOverlay(0);
+}
+function showOverlay(autoHideMs) { document.getElementById("overlay").classList.add("show"); if (overlayTimer) clearTimeout(overlayTimer); if (autoHideMs) overlayTimer = setTimeout(hideOverlay, autoHideMs); }
+function hideOverlay() { document.getElementById("overlay").classList.remove("show"); }
+
+// ── controls ──
+document.getElementById("snapBtn").onclick = () => send({type:"request_snapshot"});
+document.getElementById("reconnectBtn").onclick = () => { if (ws) try { ws.close(); } catch {} ; setTimeout(connect,200); };
+document.getElementById("clearLog").onclick = () => { logEl.innerHTML = ""; };
+document.getElementById("logBtn").onclick = (e) => { const p = document.getElementById("logpanel"); p.classList.toggle("hidden"); e.target.textContent = p.classList.contains("hidden")?"显示日志":"隐藏日志"; };
+document.getElementById("overlay").onclick = (e) => { if (e.target.id==="overlay") hideOverlay(); };
+
+connect();
+</script>
+</body>
+</html>
