@@ -135,6 +135,15 @@
   #log .row { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); white-space: pre-wrap; word-break: break-word; }
   #log .in { color: #7fd6ff; } #log .out { color: #ffd479; } #log .sys { color: #8aa; } #log .tag { opacity: .7; }
 
+  /* ── loading screen (one-time asset preload) ── */
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, #1a6b52, #0b352a); z-index: 40; transition: opacity .4s; }
+  #loading.done { opacity: 0; pointer-events: none; }
+  .loadbox { text-align: center; }
+  .loadtitle { color: var(--gold); font-size: 18px; margin-bottom: 14px; letter-spacing: 1px; }
+  .loadbar { width: 280px; height: 12px; border-radius: 6px; background: rgba(0,0,0,.4); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(231,196,106,.3); }
+  .loadfill { height: 100%; width: 0%; background: linear-gradient(90deg, #b9863a, var(--gold)); transition: width .15s; }
+  .loadpct { color: var(--muted); font-size: 12px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+
   /* ── overlay ── */
   #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); z-index: 30; }
   #overlay.show { display: flex; }
@@ -177,6 +186,11 @@
     </div>
     <div id="actionbar"><span class="hint">等待连接…</span></div>
     <div id="overlay"><div class="card" id="overlayCard"></div></div>
+    <div id="loading"><div class="loadbox">
+      <div class="loadtitle">🀄 加载牌面资源…</div>
+      <div class="loadbar"><div class="loadfill" id="loadfill"></div></div>
+      <div class="loadpct" id="loadpct">0%</div>
+    </div></div>
   </div>
 
   <div id="logpanel">
@@ -438,7 +452,25 @@ document.getElementById("clearLog").onclick = () => { logEl.innerHTML = ""; };
 document.getElementById("logBtn").onclick = (e) => { const p = document.getElementById("logpanel"); p.classList.toggle("hidden"); e.target.textContent = p.classList.contains("hidden")?"显示日志":"隐藏日志"; };
 document.getElementById("overlay").onclick = (e) => { if (e.target.id==="overlay") hideOverlay(); };
 
-connect();
+// ── one-time asset preload, then connect (no in-game tile loading) ──
+function allAssetUrls() {
+  const names = new Set(["Front", "Back"]);
+  for (const su of ["m","p","s"]) for (let r = 1; r <= 9; r++) names.add(FACE[su][r]);
+  for (const z of FACE.z) if (z) names.add(z);
+  for (const k in RED_FACE) names.add(RED_FACE[k]);
+  return [...names].map(n => `/tiles/${n}.svg`);
+}
+function preloadAssets() {
+  const urls = allAssetUrls(); let done = 0;
+  const fill = document.getElementById("loadfill"), pct = document.getElementById("loadpct");
+  const bump = () => { done++; const p = Math.round(done/urls.length*100); fill.style.width = p+"%"; pct.textContent = p+"%"; };
+  return Promise.all(urls.map(u => new Promise(res => { const img = new Image(); img.onload = img.onerror = () => { bump(); res(); }; img.src = u; })));
+}
+preloadAssets().then(() => {
+  const ld = document.getElementById("loading"); ld.classList.add("done");
+  setTimeout(() => { ld.style.display = "none"; }, 450);
+  connect();
+});
 </script>
 </body>
 </html>
