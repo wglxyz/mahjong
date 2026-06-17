@@ -29,18 +29,10 @@ function handle(m: ServerMsg) {
       log(`welcome seat=${m.your_seat} ${m.ruleset}`); break;
     case "snapshot": model.snap = m; scheduleRender(); break;
     case "event": model.applyEvent(m.event); scheduleRender(); break;
-    case "decision": {
-      pending = m.actions;
-      const hasDiscard = m.actions.some((a) => a.kind === "discard");
-      if (hasDiscard) {
-        scheduleRender(); // wait for the player to click a tile
-      } else {
-        // chunk 1: no action-button UI yet → auto-pass response windows so play continues
-        const pass = m.actions.find((a) => a.kind === "pass") || m.actions[0];
-        net.decide(pass.id); pending = null;
-      }
+    case "decision":
+      pending = m.actions;   // discards via hand click, others via the action buttons
+      scheduleRender();
       break;
-    }
     case "hand_ended": log(`hand_ended ${m.result}${m.winner != null ? " winner=" + m.winner : ""}`); break;
     case "match_ended": log("match_ended " + JSON.stringify(m.final_points)); break;
     case "error": log("ERROR " + m.error); break;
@@ -60,11 +52,7 @@ async function main() {
   catch (e) { log("tile preload error: " + e); }
 
   table = new TableView(Laya.stage as unknown as Laya.Sprite);
-  table.onDiscard = (t) => {
-    if (!pending) return;
-    const a = pending.find((x) => x.kind === "discard" && (x.tiles || []).some((tt) => tt.id === t.id));
-    if (a) { net.decide(a.id); pending = null; table.render(model, pending); }
-  };
+  table.onDecide = (id) => { net.decide(id); pending = null; table.render(model, pending); };
 
   net.onStatus = (s) => log(s);
   net.onMessage = handle;
