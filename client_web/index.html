@@ -110,6 +110,8 @@
   .station[data-rel="0"] .hand .tile.clickable { cursor: pointer; transition: transform .12s ease; }
   .station[data-rel="0"] .hand .tile.clickable:hover { transform: translateY(-12px); }
   .station[data-rel="0"] .hand .tile.drawn { margin-left: 16px; }
+  .tile.sel { z-index: 3; box-shadow: 0 0 0 2px var(--gold), 0 10px 16px rgba(0,0,0,.55); }
+  .station[data-rel="0"] .hand .tile.sel { transform: translateY(-16px); }
   .station:not([data-rel="0"]) .hand .tile { --w: 22px; }
 
   /* most-recent (in-play) discard */
@@ -225,6 +227,13 @@
     #actionbar { min-height: 52px; padding: 7px 10px; gap: 8px; }
     button.act { padding: 9px 15px; font-size: 14px; }
     .fuse { width: 130px; }
+    /* perf: cheaper shadows + no continuously-repainting shadow animations on mobile GPUs */
+    .tile { box-shadow: 0 2px 0 #c0b48d, 0 3px 4px rgba(0,0,0,.4); }
+    .tile::before { display: none; }
+    .station[data-rel="0"] .hand .tile { box-shadow: 0 2px 0 #c0b48d, 0 4px 6px rgba(0,0,0,.45); }
+    .tile.cur { animation: none; box-shadow: 0 0 0 2px var(--gold), 0 0 9px rgba(231,196,106,.75); }
+    button.act.win { animation: none; }
+    button.act .mini .tile { filter: none; }
   }
   @media (pointer: coarse) and (orientation: portrait) { #rotateHint.on { display: flex; } }
 </style>
@@ -305,6 +314,7 @@ let snap = null, pendingActions = null, globalLastDiscard = null, riichiArmed = 
 let reserveMs = RESERVE_FULL_MS;   // long-think pool, refilled each hand
 const ptsShown = {};               // seat -> currently displayed score (for change tween)
 const scoreTweens = {};            // seat -> active rAF id
+let selectedTileId = null;         // mobile two-step discard: first tap selects, second confirms
 const seenDiscardIds = new Set(), seenMeldKeys = new Set(), animatedDrawIds = new Set();
 let prevRiichi = {};
 
@@ -340,13 +350,13 @@ function handle(msg) {
       seenDiscardIds.clear(); seenMeldKeys.clear(); animatedDrawIds.clear(); globalLastDiscard = null; prevRiichi = {}; reserveMs = RESERVE_FULL_MS;
       for (const k in ptsShown) delete ptsShown[k]; for (const k in scoreTweens) delete scoreTweens[k];
       setTimeout(() => send({type:"request_snapshot"}), 150); break;
-    case "snapshot": snap = msg; render(); break;
-    case "event": applyEvent(msg.event); render(); break;
+    case "snapshot": snap = msg; scheduleRender(); break;
+    case "event": applyEvent(msg.event); scheduleRender(); break;
     case "decision":
       pendingActions = msg.actions;
       // client-side guard: nothing to decide (only 过) → skip instantly, no countdown
       if (pendingActions.length === 1 && pendingActions[0].kind === "pass") { decide(pendingActions[0].id); break; }
-      renderActions(); render(); break;
+      renderActions(); scheduleRender(); break;
     case "hand_ended": showHandEnd(msg); break;
     case "match_ended": showMatchEnd(msg); break;
     case "error": log("sys","ERROR: "+msg.error); break;
@@ -394,6 +404,10 @@ function reconcile(container, items, key, build, decorate) {
     prev = ch;
   }
 }
+
+// coalesce bursts of events (AI turns fire many in quick succession) into one paint
+let renderQueued = false;
+function scheduleRender() { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); }
 
 function render() {
   if (!snap) return;
@@ -476,7 +490,8 @@ function renderHand(container, sv, seatNo, rel) {
         const act = discardActionFor(t);
         el.classList.toggle("clickable", !!act);
         el.classList.toggle("dimmed", riichiArmed && !act);   // can't riichi-discard this tile
-        el.onclick = act ? () => decide(act.id) : null; });
+        el.classList.toggle("sel", isMobile && !!act && selectedTileId===t.id);
+        el.onclick = act ? () => onHandTap(t, act) : null; });
   } else {
     const backs = Array.from({length: sv.hand_count||0}, (_,i)=>i);
     reconcile(container, backs, i => "b"+i, () => makeTile(null));
@@ -499,11 +514,18 @@ function discardActionFor(tile) {
   const kind = riichiArmed ? "riichi" : "discard";
   return pendingActions.find(a => a.kind===kind && a.tiles && a.tiles.some(t => t.id===tile.id));
 }
+// desktop: click discards directly. mobile: first tap raises/selects the tile,
+// second tap on the same tile confirms (tapping another tile moves the selection).
+function onHandTap(tile, act) {
+  if (!isMobile) { decide(act.id); return; }
+  if (selectedTileId === tile.id) decide(act.id);
+  else { selectedTileId = tile.id; scheduleRender(); }
+}
 
 // Bottom bar holds ONLY special actions (chi/pon/kan/riichi/tsumo/ron/pass).
 // Discarding is done by clicking a tile in your hand (Mahjong-Soul style).
 function renderActions() {
-  const bar = document.getElementById("actionbar"); bar.innerHTML = ""; riichiArmed = false;
+  const bar = document.getElementById("actionbar"); bar.innerHTML = ""; riichiArmed = false; selectedTileId = null;
   if (!pendingActions || !pendingActions.length) { bar.innerHTML = '<span class="hint">轮到对家 / AI…</span>'; cancelTimer(); return; }
 
   const hasDiscard = pendingActions.some(a => a.kind==="discard");
@@ -515,7 +537,7 @@ function renderActions() {
   if (hasRiichi) {
     const rb = elc("button","act riichi"); rb.textContent = "立直";
     rb.onclick = () => {
-      riichiArmed = !riichiArmed; rb.classList.toggle("armed", riichiArmed);
+      riichiArmed = !riichiArmed; selectedTileId = null; rb.classList.toggle("armed", riichiArmed);
       const h = bar.querySelector(".hint"); if (h) h.textContent = riichiArmed ? "选择要切出的牌 · 立直" : "点击手牌出牌";
       render();
     };
@@ -536,7 +558,7 @@ function renderActions() {
   startTimerForDecision(bar);
 }
 function decide(actionId) {
-  cancelTimer(); riichiArmed = false; send({type:"decide", action_id: actionId}); pendingActions = null;
+  cancelTimer(); riichiArmed = false; selectedTileId = null; send({type:"decide", action_id: actionId}); pendingActions = null;
   document.getElementById("actionbar").innerHTML = '<span class="hint">已出招，等待…</span>'; render();
 }
 
