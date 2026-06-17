@@ -30,6 +30,8 @@ log = logging.getLogger("avid.server")
 # and the page connects its WebSocket back to the same host:port.
 WEB_ROOT = Path(__file__).resolve().parent.parent / "client_web"
 WEB_INDEX = WEB_ROOT / "index.html"
+# Laya (Cocos-alternative) client, built by Vite to client_laya/dist, served under /laya/
+LAYA_ROOT = Path(__file__).resolve().parent.parent / "client_laya" / "dist"
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -54,11 +56,16 @@ class App:
         if (request.headers.get("Upgrade") or "").lower() == "websocket":
             return None  # real WS client — proceed to handshake → handle()
 
-        # map URL path → file under client_web/ (index.html for "/"); guard traversal
+        # map URL path → file; "/laya/..." serves the Laya build, everything else client_web/
         raw_path = (request.path or "/").split("?", 1)[0]
-        rel = raw_path.lstrip("/") or "index.html"
-        target = (WEB_ROOT / rel).resolve()
-        if not str(target).startswith(str(WEB_ROOT)) or not target.is_file():
+        if raw_path == "/laya" or raw_path.startswith("/laya/"):
+            root = LAYA_ROOT
+            rel = raw_path[len("/laya"):].lstrip("/") or "index.html"
+        else:
+            root = WEB_ROOT
+            rel = raw_path.lstrip("/") or "index.html"
+        target = (root / rel).resolve()
+        if not str(target).startswith(str(root)) or not target.is_file():
             return connection.respond(404, "not found\n")
 
         body = target.read_bytes()

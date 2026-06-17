@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Avid Mahjong — Laya demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b352a; overflow: hidden; }
+  #log { position: fixed; left: 8px; bottom: 8px; right: 8px; max-height: 28%; overflow-y: auto;
+    font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #8fd; z-index: 10;
+    background: rgba(0,0,0,.4); border-radius: 6px; padding: 6px 8px; }
+  #log .row { white-space: pre-wrap; word-break: break-word; }
+</style>
+<!-- Laya engine core (global window.Laya), vendored from LayaAir 3.4 libs -->
+<script src="/laya/libs/laya.core.js"></script>
+</head>
+<body>
+  <div id="log"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
