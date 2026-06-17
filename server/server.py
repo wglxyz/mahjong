@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gzip
 import json
 import logging
 import sys
@@ -71,9 +72,23 @@ class App:
         body = target.read_bytes()
         headers = Headers()
         headers["Content-Type"] = _CONTENT_TYPES.get(target.suffix, "application/octet-stream")
+
+        # Caching: index.html must always revalidate (it points at hashed bundles);
+        # everything else is versioned/hashed in its URL, so cache it hard → instant
+        # revisits with no network (the "resource pack already downloaded" effect).
+        if target.name == "index.html":
+            headers["Cache-Control"] = "no-cache"
+        else:
+            headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+        # gzip text-ish payloads (the 2.2MB Laya engine shrinks to ~600KB)
+        accept = (request.headers.get("Accept-Encoding") or "")
+        if "gzip" in accept and target.suffix in (".js", ".svg", ".html", ".css", ".json"):
+            body = gzip.compress(body, 6)
+            headers["Content-Encoding"] = "gzip"
+            headers["Vary"] = "Accept-Encoding"
+
         headers["Content-Length"] = str(len(body))
-        if target.suffix == ".svg":  # tiles are immutable — let the browser cache them
-            headers["Cache-Control"] = "public, max-age=86400"
         return Response(200, "OK", headers, body)
 
     async def handle(self, ws) -> None:

@@ -138,21 +138,23 @@ export class TableView {
         sp.on(Laya.Event.MOUSE_OVER, this, () => { sp!.y = baseY - 14; });
         sp.on(Laya.Event.MOUSE_OUT, this, () => { sp!.y = baseY; });
       }
-      // position (no tween for reused unless it's a fresh appear)
       if (created) {
         sp.pos(p.x, p.y);
         if (p.kind === "discard" && p.tile.id != null && !this.seenDiscards.has(p.tile.id)) {
           this.seenDiscards.add(p.tile.id);
-          sp.alpha = 0; sp.y = p.y - 24;
-          Laya.Tween.to(sp, { alpha: 1, y: p.y }, 320, Laya.Ease.cubicOut);
+          sp.alpha = 0; sp.y = p.y - 26;
+          Laya.Tween.to(sp, { alpha: 1, y: p.y }, 360, Laya.Ease.cubicOut);
         } else if (p.kind === "hand" && p.drawn && p.tile.id != null && !this.animatedDraws.has(p.tile.id)) {
           this.animatedDraws.add(p.tile.id);
-          sp.alpha = 0.3; sp.y = p.y - 30;
-          Laya.Tween.to(sp, { alpha: 1, y: p.y }, 520, Laya.Ease.backOut);
+          sp.alpha = 0.3; sp.y = p.y - 32;
+          Laya.Tween.to(sp, { alpha: 1, y: p.y }, 560, Laya.Ease.backOut);
         }
-      } else {
+      } else if (p.kind === "hand") {
+        // hand tiles shift when the count changes — reposition them (instant).
         sp.pos(p.x, p.y); sp.alpha = 1;
       }
+      // reused discards: leave untouched so any in-flight appear tween finishes
+      // (this was the bug that made discard animations snap/overlap).
     }
   }
 
