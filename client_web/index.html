@@ -79,10 +79,12 @@
   .scorechip.dealer .sc-dot { box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 1px rgba(255,255,255,.3); }
   .scorechip .sc-pts { color: var(--gold); font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
   .scorechip .sc-rii { color: var(--red); font-weight: 800; font-size: 13px; }
-  .scorechip[data-rel="0"] { left: 50%; bottom: -13px; transform: translate(-50%, 100%); }
-  .scorechip[data-rel="2"] { left: 50%; top: -13px; transform: translate(-50%, -100%); }
-  .scorechip[data-rel="1"] { right: -13px; top: 50%; transform: translate(100%, -50%); }
-  .scorechip[data-rel="3"] { left: -13px; top: 50%; transform: translate(-100%, -50%); }
+  /* each chip is centered on a point just outside one well edge; side chips are
+     rotated (like their player's station) so they don't reach into the pond */
+  .scorechip[data-rel="0"] { left: 50%; top: 100%; transform: translate(-50%,-50%); margin-top: 17px; }
+  .scorechip[data-rel="2"] { left: 50%; top: 0;    transform: translate(-50%,-50%); margin-top: -17px; }
+  .scorechip[data-rel="1"] { left: 100%; top: 50%; transform: translate(-50%,-50%) rotate(-90deg); margin-left: 22px; }
+  .scorechip[data-rel="3"] { left: 0;    top: 50%; transform: translate(-50%,-50%) rotate(90deg);  margin-left: -22px; }
   .scorechip.anim-riichi { animation: badgeFlash .85s ease-in-out 2; }
 
 
