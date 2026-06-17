@@ -70,10 +70,10 @@ export function makeBack(w: number): Laya.Sprite {
   const r = Math.max(3, Math.round(w * 0.1));
   const sp = new Laya.Sprite();
   const g = sp.graphics;
-  g.drawRoundRect(Math.round(w * 0.06), side + Math.round(side * 0.5), w, h, r, r, r, r, "#00000048");
-  g.drawRoundRect(0, side, w, h, r, r, r, r, "#0a2c22");          // dark green side
+  g.drawRoundRect(Math.round(w * 0.05), side + Math.round(side * 0.5), w, h, r, r, r, r, "#00000040");
+  g.drawRoundRect(0, side, w, h, r, r, r, r, "#cfc3a3");          // same ivory body as face-up tiles
   const back = Laya.loader.getRes(url("Back"));
-  if (back) g.drawTexture(back, 0, 0, w, h);
+  if (back) g.drawTexture(back, 0, 0, w, h);                      // only the back pattern is coloured
   sp.size(w, h + side);
   return sp;
 }
