@@ -54,37 +54,37 @@
   .meldgroup { display: flex; gap: 1px; padding: 1px; border-radius: 4px; background: rgba(0,0,0,.18); }
   .hand { display: flex; gap: 3px; align-items: flex-end; justify-content: center; flex-wrap: nowrap; }
 
-  /* center info cube */
-  .cube { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 33%; height: 33%;
-          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center;
-          background: linear-gradient(160deg, rgba(10,40,30,.92), rgba(8,30,23,.92)); border: 1px solid rgba(231,196,106,.35);
-          border-radius: 12px; box-shadow: 0 0 24px rgba(0,0,0,.5) inset; pointer-events: none; }
-  .cube .round { font-size: 1.9vh; color: var(--gold); font-weight: 800; letter-spacing: 1px; }
-  .cube .sub { color: var(--muted); font-size: 1.25vh; }
-  .cube .doraLbl { color: var(--muted); font-size: 1.05vh; margin-top: 3px; }
-  .cube .dora { display: flex; gap: 3px; }
-  .cube .phase { font-size: 1vh; color: var(--muted); opacity: .8; }
+  /* center "well": round / remaining wall / dead-wall with dora (Mahjong Soul style) */
+  .well { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 26%; aspect-ratio: 1;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-align: center;
+          background: linear-gradient(160deg, rgba(8,42,31,.92), rgba(5,24,18,.94)); border: 1px solid rgba(231,196,106,.3);
+          border-radius: 14px; box-shadow: 0 0 30px rgba(0,0,0,.5) inset, 0 6px 22px rgba(0,0,0,.45); }
+  .well .wround { font-size: 2.1vh; color: var(--gold); font-weight: 800; letter-spacing: 1px; }
+  .well .wcount { font-size: 1.5vh; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .well .wlbl { font-size: .95vh; color: var(--muted); margin-top: 5px; letter-spacing: 1px; }
+  .well .deadwall { display: flex; gap: 1px; align-items: center; }
+  .well .deadwall .tile { --w: 17px; margin-bottom: 2px; }
 
-  /* player plates (NOT rotated — readable), pinned to corners (Mahjong Soul style) */
-  .badge { position: absolute; display: flex; align-items: center; gap: 9px; padding: 5px 15px 5px 5px; border-radius: 999px;
-           background: linear-gradient(135deg, rgba(18,48,38,.96), rgba(9,28,22,.96)); border: 1px solid rgba(231,196,106,.22);
-           pointer-events: auto; transition: box-shadow .25s, border-color .25s; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
-  .badge.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), 0 0 22px rgba(231,196,106,.5); }
-  .badge .windchip { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-           font-size: 17px; font-weight: 800; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 4px rgba(0,0,0,.4); }
-  .windchip.w1 { background: radial-gradient(circle at 35% 28%, #ef7d63, #c0392b); }
-  .windchip.w2 { background: radial-gradient(circle at 35% 28%, #54bd81, #2e8b57); }
-  .windchip.w3 { background: radial-gradient(circle at 35% 28%, #62a0dd, #2f6fb0); }
-  .windchip.w4 { background: radial-gradient(circle at 35% 28%, #b095d8, #6f4fa0); }
-  .badge.dealer .windchip { box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 1px rgba(255,255,255,.3), 0 2px 4px rgba(0,0,0,.4); }
-  .badge .who { display: flex; flex-direction: column; line-height: 1.12; }
-  .badge .who .nm { font-size: 11px; color: var(--muted); font-weight: 600; }
-  .badge .who .pts { font-size: 16px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
-  .badge .rii { color: var(--red); font-weight: 800; font-size: 15px; }
-  .badge[data-rel="0"] { left: 10px; bottom: 10px; }
-  .badge[data-rel="1"] { right: 10px; bottom: 10px; }
-  .badge[data-rel="2"] { right: 10px; top: 10px; }
-  .badge[data-rel="3"] { left: 10px; top: 10px; }
+  /* score chips around the well, facing each player (replaces corner badges → no tile occlusion) */
+  .scorechip { position: absolute; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px;
+               background: linear-gradient(135deg, rgba(16,44,35,.97), rgba(8,26,20,.97)); border: 1px solid rgba(231,196,106,.2);
+               white-space: nowrap; pointer-events: auto; box-shadow: 0 3px 10px rgba(0,0,0,.45); transition: box-shadow .25s, border-color .25s; }
+  .scorechip.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(231,196,106,.55); }
+  .scorechip .sc-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+               font-size: 13px; font-weight: 800; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  .sc-dot.w1 { background: radial-gradient(circle at 35% 28%, #ef7d63, #c0392b); }
+  .sc-dot.w2 { background: radial-gradient(circle at 35% 28%, #54bd81, #2e8b57); }
+  .sc-dot.w3 { background: radial-gradient(circle at 35% 28%, #62a0dd, #2f6fb0); }
+  .sc-dot.w4 { background: radial-gradient(circle at 35% 28%, #b095d8, #6f4fa0); }
+  .scorechip.dealer .sc-dot { box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 1px rgba(255,255,255,.3); }
+  .scorechip .sc-pts { color: var(--gold); font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .scorechip .sc-rii { color: var(--red); font-weight: 800; font-size: 13px; }
+  .scorechip[data-rel="0"] { left: 50%; bottom: -13px; transform: translate(-50%, 100%); }
+  .scorechip[data-rel="2"] { left: 50%; top: -13px; transform: translate(-50%, -100%); }
+  .scorechip[data-rel="1"] { right: -13px; top: 50%; transform: translate(100%, -50%); }
+  .scorechip[data-rel="3"] { left: -13px; top: 50%; transform: translate(-100%, -50%); }
+  .scorechip.anim-riichi { animation: badgeFlash .85s ease-in-out 2; }
+
 
   /* ── 3D tiles ── */
   .tile { --w: 24px; width: var(--w); aspect-ratio: 3 / 4; position: relative; flex: 0 0 auto;
@@ -102,7 +102,6 @@
   .station[data-rel="0"] .hand .tile.clickable:hover { transform: translateY(-12px); }
   .station[data-rel="0"] .hand .tile.drawn { margin-left: 16px; }
   .station:not([data-rel="0"]) .hand .tile { --w: 22px; }
-  .cube .dora .tile { --w: 22px; }
 
   /* most-recent (in-play) discard */
   .tile.cur { z-index: 2; box-shadow: 0 1px 0 #d3c8a6, 0 2px 0 #c0b48d, 0 0 0 2px var(--gold), 0 0 12px 3px rgba(231,196,106,.85); animation: curPulse 1.1s ease-in-out infinite; }
@@ -116,7 +115,6 @@
   @keyframes drawBounce { 0% { transform: translateY(-26px) scale(1.1); opacity: .2; } 55% { transform: translateY(6px); } 100% { transform: none; } }
   .anim-draw { animation: drawBounce .5s ease-out; }
   @keyframes badgeFlash { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 0 2px var(--red) inset, 0 0 16px rgba(210,59,59,.6); } }
-  .badge.anim-riichi { animation: badgeFlash .85s ease-in-out 2; }
 
   /* ── action bar + burning fuse ── */
   #actionbar { flex: 0 0 auto; min-height: 72px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; padding: 10px 20px; background: linear-gradient(0deg, #06201a, #0a3024); border-top: 1px solid #1d5b48; }
@@ -144,6 +142,19 @@
   .fuse { position: relative; width: 240px; height: 16px; border-radius: 8px; background: repeating-linear-gradient(90deg, #b9863a 0 7px, #caa45a 7px 14px); box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
   .fuse .char { position: absolute; top: 0; right: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, #1a130c, #2a2018); border-radius: 0 8px 8px 0; }
   .fuse .flame { position: absolute; top: -10px; font-size: 20px; transform: translateX(-50%); filter: drop-shadow(0 0 5px #ff9b2e); pointer-events: none; }
+  .fuse.reserve { background: repeating-linear-gradient(90deg, #c0392b 0 7px, #e05a4a 7px 14px); box-shadow: inset 0 0 0 1px rgba(0,0,0,.3), 0 0 12px rgba(210,59,59,.7); }
+
+  /* call announcement banner (碰/吃/杠/立直/荣和/自摸) */
+  .cbwrap { position: absolute; z-index: 25; pointer-events: none; }
+  .cbwrap.rel0 { left: 50%; bottom: 17%; transform: translateX(-50%); }
+  .cbwrap.rel2 { left: 50%; top: 17%; transform: translateX(-50%); }
+  .cbwrap.rel1 { right: 12%; top: 50%; transform: translateY(-50%); }
+  .cbwrap.rel3 { left: 12%; top: 50%; transform: translateY(-50%); }
+  .callbanner { font-size: 5.2vh; font-weight: 900; letter-spacing: 3px; color: #fff;
+    -webkit-text-stroke: 1.5px rgba(0,0,0,.55); text-shadow: 0 3px 0 rgba(0,0,0,.45), 0 0 22px rgba(255,255,255,.35);
+    transform-origin: center; animation: callIn 1.05s cubic-bezier(.2,1.4,.4,1) forwards; }
+  .cb-pon, .cb-kan { color: #ffcf6a; } .cb-chi { color: #8fe3a0; } .cb-riichi { color: var(--gold); } .cb-ron, .cb-tsumo { color: #ff8a6a; }
+  @keyframes callIn { 0% { transform: scale(.3) rotate(-12deg); opacity: 0; } 22% { transform: scale(1.2) rotate(-7deg); opacity: 1; } 70% { transform: scale(1) rotate(-7deg); opacity: 1; } 100% { transform: scale(1) rotate(-7deg); opacity: 0; } }
 
   /* ── log panel ── */
   #logpanel { width: 340px; flex: 0 0 auto; background: #07211a; border-left: 1px solid #1d5b48; display: flex; flex-direction: column; min-height: 0; }
@@ -195,11 +206,16 @@
         <div class="station" data-rel="1"><div class="pond"></div><div class="melds"></div><div class="hand"></div></div>
         <div class="station" data-rel="3"><div class="pond"></div><div class="melds"></div><div class="hand"></div></div>
         <div class="station" data-rel="0"><div class="pond"></div><div class="melds"></div><div class="hand"></div></div>
-        <div class="cube" id="cube"></div>
-        <div class="badge" data-rel="0"></div>
-        <div class="badge" data-rel="1"></div>
-        <div class="badge" data-rel="2"></div>
-        <div class="badge" data-rel="3"></div>
+        <div class="well" id="well">
+          <div class="wround" id="wround"></div>
+          <div class="wcount" id="wcount"></div>
+          <div class="wlbl">宝牌 ▸ 牌山</div>
+          <div class="deadwall" id="deadwall"></div>
+          <div class="scorechip" data-rel="0"></div>
+          <div class="scorechip" data-rel="1"></div>
+          <div class="scorechip" data-rel="2"></div>
+          <div class="scorechip" data-rel="3"></div>
+        </div>
       </div>
     </div>
     <div id="actionbar"><span class="hint">等待连接…</span></div>
@@ -224,7 +240,10 @@
 <script>
 "use strict";
 
-const RESPONSE_MS = 5000, TURN_MS = 10000;
+// Mahjong-Soul-style clock: 5s base per decision + a 20s "long-think" reserve
+// pool that refills each hand and is consumed only after the base runs out.
+const BASE_MS = 5000, RESERVE_FULL_MS = 20000;
+const CALL_LABEL = { chi:"吃", pon:"碰", minkan:"杠", ankan:"杠", shouminkan:"杠", kan:"杠", riichi:"立直", ron:"荣和", tsumo:"自摸" };
 const WINDS = ["", "東", "南", "西", "北"];
 const FACE = {
   m: ["", "Man1","Man2","Man3","Man4","Man5","Man6","Man7","Man8","Man9"],
@@ -238,6 +257,7 @@ const KIND_LABEL = { discard:"切", pass:"过", chi:"吃", pon:"碰", kan:"杠",
 
 let ws = null, yourSeat = 0, seatNames = ["E","S","W","N"], ruleset = "?";
 let snap = null, pendingActions = null, globalLastDiscard = null, riichiArmed = false;
+let reserveMs = RESERVE_FULL_MS;   // long-think pool, refilled each hand
 const seenDiscardIds = new Set(), seenMeldKeys = new Set(), animatedDrawIds = new Set();
 let prevRiichi = {};
 
@@ -270,7 +290,7 @@ function handle(msg) {
   switch (msg.type) {
     case "welcome":
       yourSeat = msg.your_seat; seatNames = msg.seats; ruleset = msg.ruleset;
-      seenDiscardIds.clear(); seenMeldKeys.clear(); animatedDrawIds.clear(); globalLastDiscard = null; prevRiichi = {};
+      seenDiscardIds.clear(); seenMeldKeys.clear(); animatedDrawIds.clear(); globalLastDiscard = null; prevRiichi = {}; reserveMs = RESERVE_FULL_MS;
       setTimeout(() => send({type:"request_snapshot"}), 150); break;
     case "snapshot": snap = msg; render(); break;
     case "event": applyEvent(msg.event); render(); break;
@@ -289,7 +309,7 @@ function applyEvent(e) {
   if (!snap) return;
   const seat = (s) => snap.seats.find(x => x.seat === s);
   switch (e.kind) {
-    case "hand_started": snap.dealer = e.dealer; snap.round_wind = e.round_wind; snap.hand_number = e.hand_number; globalLastDiscard = null; break;
+    case "hand_started": snap.dealer = e.dealer; snap.round_wind = e.round_wind; snap.hand_number = e.hand_number; globalLastDiscard = null; reserveMs = RESERVE_FULL_MS; break;
     case "tile_drawn": { const s = seat(e.seat); if (!s) break;
       s.hand_count = (s.hand_count||0)+1; snap.current_seat = e.seat;
       if (e.tile && e.seat === yourSeat) { (s.hand=s.hand||[]).push(e.tile); snap.last_drawn_tile = e.tile; } break; }
@@ -298,9 +318,10 @@ function applyEvent(e) {
       if (e.seat === yourSeat && e.tile && s.hand) { const i = s.hand.findIndex(t => t.id===e.tile.id); if (i>=0) s.hand.splice(i,1); snap.last_drawn_tile = null; }
       else { s.hand_count = Math.max(0,(s.hand_count||1)-1); }
       if (e.riichi) s.riichi = true; break; }
-    case "riichi_declared": { const s = seat(e.seat); if (s) s.riichi = true; break; }
+    case "riichi_declared": { const s = seat(e.seat); if (s) s.riichi = true; flashCall(e.seat, "立直", "riichi"); break; }
     case "meld_formed": { const s = seat(e.seat); if (!s) break;
-      (s.melds=s.melds||[]).push({meld_type:e.meld_type, tiles:e.tiles||[], called_from:e.called_from}); globalLastDiscard = null; break; }
+      (s.melds=s.melds||[]).push({meld_type:e.meld_type, tiles:e.tiles||[], called_from:e.called_from}); globalLastDiscard = null;
+      flashCall(e.seat, CALL_LABEL[e.meld_type] || "鸣", e.meld_type==="chi" ? "chi" : "pon"); break; }
   }
 }
 
@@ -331,17 +352,18 @@ function render() {
   document.getElementById("gameinfo").innerHTML =
     `规则 <b>${ruleset}</b> · 你 <b>${WINDS[yourSeat+1]||yourSeat}</b> · ${WINDS[snap.round_wind]||""}${snap.hand_number}局 · 余 <b>${snap.wall_count}</b>`;
 
-  const cube = document.getElementById("cube"); cube.innerHTML = "";
-  cube.appendChild(elc("div","round", `${WINDS[snap.round_wind]||"?"} ${snap.hand_number}`));
-  cube.appendChild(elc("div","sub", `庄 ${WINDS[snap.dealer+1]||snap.dealer} · 余 ${snap.wall_count}`));
-  cube.appendChild(elc("div","doraLbl","宝牌"));
-  const dora = elc("div","dora"); (snap.dora_indicators||[]).forEach(t => dora.appendChild(makeTile(t))); cube.appendChild(dora);
-  const cs = snap.current_seat;
-  cube.appendChild(elc("div","phase", (snap.phase||"-")+" · 当前 "+(cs==null?"-":(WINDS[cs+1]||cs))));
+  // center well: round / remaining wall count / dead-wall with dora
+  document.getElementById("wround").textContent = `${WINDS[snap.round_wind]||"?"} ${snap.hand_number}`;
+  document.getElementById("wcount").textContent = `山 ${snap.wall_count}`;
+  const dw = document.getElementById("deadwall"); dw.innerHTML = "";
+  const dora = snap.dora_indicators || [];
+  dora.forEach(t => dw.appendChild(makeTile(t)));                       // dora indicators, face up
+  const backs = Math.max(0, (snap.dead_wall_count || 0) - dora.length);
+  for (let i = 0; i < Math.min(backs, 6); i++) dw.appendChild(makeTile(null));  // rest of dead wall, face down
 
   for (let rel = 0; rel < 4; rel++) {
     const seatNo = relToSeat(rel), sv = snap.seats.find(s => s.seat===seatNo);
-    renderBadge(document.querySelector(`.badge[data-rel="${rel}"]`), sv, seatNo);
+    renderScoreChip(document.querySelector(`.scorechip[data-rel="${rel}"]`), sv, seatNo);
     const st = document.querySelector(`.station[data-rel="${rel}"]`);
     renderPond(st.querySelector(".pond"), sv, seatNo);
     renderMelds(st.querySelector(".melds"), sv, seatNo);
@@ -351,7 +373,7 @@ function render() {
 function relToSeat(rel) { return ((yourSeat + rel) % 4 + 4) % 4; }
 function elc(tag, cls, txt) { const d = document.createElement(tag); if (cls) d.className = cls; if (txt!=null) d.textContent = txt; return d; }
 
-function renderBadge(b, sv, seatNo) {
+function renderScoreChip(b, sv, seatNo) {
   b.classList.toggle("active", snap.current_seat===seatNo);
   b.classList.toggle("dealer", snap.dealer===seatNo);
   if (sv && sv.riichi && !prevRiichi[seatNo]) { b.classList.remove("anim-riichi"); void b.offsetWidth; b.classList.add("anim-riichi"); }
@@ -359,12 +381,11 @@ function renderBadge(b, sv, seatNo) {
   b.innerHTML = "";
   if (!sv) return;
   const sw = ((seatNo - snap.dealer + 4)%4)+1;
-  b.appendChild(elc("div","windchip w"+sw, WINDS[sw]));
-  const who = elc("div","who");
-  who.appendChild(elc("div","nm", sv.name + (seatNo===yourSeat?"（你）":"") + (snap.dealer===seatNo?" · 庄":"")));
-  who.appendChild(elc("div","pts", sv.points));
-  b.appendChild(who);
-  if (sv.riichi) b.appendChild(elc("div","rii","立"));
+  b.appendChild(elc("div","sc-dot w"+sw, WINDS[sw]));
+  b.appendChild(elc("span","sc-pts", sv.points));
+  if (seatNo===yourSeat) b.appendChild(elc("span","sc-rii","你")), b.lastChild.style.color = "var(--muted)";
+  if (sv.riichi) b.appendChild(elc("span","sc-rii","立"));
+  b.title = sv.name;
 }
 
 function renderMelds(container, sv, seatNo) {
@@ -454,20 +475,46 @@ function startTimerForDecision(bar) {
   cancelTimer();
   if (!document.getElementById("timerOn").checked) return;
   const isResponse = pendingActions.some(a => a.kind==="pass");
-  const durMs = isResponse ? RESPONSE_MS : TURN_MS;
   const onExpire = () => { if (!pendingActions) return; let pick;
     if (isResponse) pick = pendingActions.find(a => a.kind==="pass");
     else { const ds = pendingActions.filter(a => a.kind==="discard"); pick = ds.length ? ds[Math.floor(Math.random()*ds.length)] : pendingActions[0]; }
     if (pick) decide(pick.id); };
+
   const wrap = elc("div","fuse-wrap");
-  wrap.appendChild(elc("span","ftxt", isResponse ? "吃/碰/杠/和（超时自动过）" : "出牌（超时随机打）"));
+  const ftxt = elc("span","ftxt", isResponse ? "吃/碰/杠/和" : "出牌");
   const fuse = elc("div","fuse"); const char = elc("div","char"); const flame = elc("span","flame"); flame.textContent = "🔥";
-  fuse.append(char, flame); wrap.appendChild(fuse); const secs = elc("span","secs"); wrap.appendChild(secs); bar.appendChild(wrap);
-  const start = performance.now();
-  function tick(now) { const p = Math.min(1,(now-start)/durMs);
-    char.style.width = (p*100)+"%"; flame.style.left = ((1-p)*100)+"%"; secs.textContent = (Math.max(0,(1-p)*durMs)/1000).toFixed(1)+"s";
-    if (p >= 1) { fuseRAF = null; onExpire(); return; } fuseRAF = requestAnimationFrame(tick); }
+  fuse.append(char, flame); const secs = elc("span","secs");
+  wrap.append(ftxt, fuse, secs); bar.appendChild(wrap);
+
+  let last = performance.now(), baseLeft = BASE_MS;
+  function tick(now) {
+    const dt = now - last; last = now;
+    if (baseLeft > 0) baseLeft -= dt; else reserveMs -= dt;
+    const inReserve = baseLeft <= 0;
+    if (inReserve) {
+      fuse.classList.add("reserve");
+      const p = Math.max(0, reserveMs) / RESERVE_FULL_MS;
+      char.style.width = (1-p)*100+"%"; flame.style.left = p*100+"%";
+      secs.textContent = "长考 " + (Math.max(0,reserveMs)/1000).toFixed(1)+"s";
+    } else {
+      const p = baseLeft / BASE_MS;
+      char.style.width = (1-p)*100+"%"; flame.style.left = p*100+"%";
+      secs.textContent = (baseLeft/1000).toFixed(1)+"s";
+    }
+    if (inReserve && reserveMs <= 0) { reserveMs = 0; fuseRAF = null; onExpire(); return; }
+    fuseRAF = requestAnimationFrame(tick);
+  }
   fuseRAF = requestAnimationFrame(tick);
+}
+
+// Mahjong-Soul-style call banner: big text flashes on the caller's side
+function flashCall(seatNo, text, kind) {
+  const felt = document.getElementById("felt"); if (!felt) return;
+  const rel = ((seatNo - yourSeat) % 4 + 4) % 4;
+  const wrap = elc("div","cbwrap rel"+rel);
+  const b = elc("div","callbanner cb-"+(kind||""), text);
+  wrap.appendChild(b); felt.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 1100);
 }
 
 let overlayTimer = null;
@@ -477,7 +524,9 @@ function showHandEnd(m) {
     const reason = m.abort_reason ? (ABORT_NAMES[m.abort_reason]||m.abort_reason) : "荒牌流局";
     card.innerHTML = `<h2>流局</h2><div class="sub">${reason}</div>`;
   } else {
-    const who = (m.winners&&m.winners.length?m.winners:[m.winner]).map(s=>seatNames[s]||s).join("、");
+    const winners = (m.winners&&m.winners.length?m.winners:[m.winner]).filter(s=>s!=null);
+    winners.forEach(s => flashCall(s, m.loser!=null?"荣和":"自摸", m.loser!=null?"ron":"tsumo"));
+    const who = winners.map(s=>seatNames[s]||s).join("、");
     const via = m.loser!=null ? `荣和（放铳：${seatNames[m.loser]||m.loser}）` : "自摸";
     let yakuHtml = "";
     if (m.yaku && m.yaku.length) yakuHtml = '<div class="yaku">' + m.yaku.map(y=>`<div><span>${y[0]}</span><span>${y[1]}番</span></div>`).join("") + "</div>";
