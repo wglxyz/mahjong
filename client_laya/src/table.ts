@@ -2,7 +2,7 @@
 // Upright layout (rotation later). Discard/draw tween in; only newly-seen tiles animate.
 import type { GameModel } from "./state";
 import type { ActionView, TileView, SeatView } from "./protocol";
-import { makeTile, makeBack } from "./tiles";
+import { makeTile, makeBack, tileFullHeight } from "./tiles";
 
 const WINDS = ["", "東", "南", "西", "北"];
 export const DESIGN_W = 1280;
@@ -100,27 +100,27 @@ export class TableView {
           Laya.Tween.to(sp, { y: ty, alpha: 1 }, 420, Laya.Ease.backOut);
         }
       });
-      this.pond(sv.discards || [], (DESIGN_W - 6 * 34) / 2, 600, 32, curId);
+      this.pond(sv.discards || [], (DESIGN_W - 6 * 27) / 2, 592, 26, curId);
     } else if (rel === 2) {
-      this.text(label, 540, 30, 18, labelColor, active);
-      this.backsRow(sv.hand_count, 480, 60, 26);
-      this.pond(sv.discards || [], (DESIGN_W - 6 * 30) / 2, 150, 28, curId);
+      this.text(label, 540, 24, 18, labelColor, active);
+      this.backsRow(sv.hand_count, 490, 52, 24);
+      this.pond(sv.discards || [], (DESIGN_W - 6 * 27) / 2, 140, 26, curId);
     } else if (rel === 3) {
-      this.text(label, 30, 330, 18, labelColor, active);
-      this.backsCol(sv.hand_count, 40, 360, 24);
-      this.pond(sv.discards || [], 210, 360, 26, curId);
+      this.text(label, 24, 322, 18, labelColor, active);
+      this.backsCol(sv.hand_count, 36, 352, 22);
+      this.pond(sv.discards || [], 200, 352, 24, curId);
     } else {
-      this.text(label, 980, 330, 18, labelColor, active);
-      this.backsCol(sv.hand_count, 1210, 360, 24);
-      this.pond(sv.discards || [], 800, 360, 26, curId);
+      this.text(label, 980, 322, 18, labelColor, active);
+      this.backsCol(sv.hand_count, 1216, 352, 22);
+      this.pond(sv.discards || [], 812, 352, 24, curId);
     }
   }
 
   private pond(discards: TileView[], x: number, y: number, w: number, curId: number | null) {
-    const cols = 6, gap = 2, h = Math.round(w * 4 / 3);
+    const cols = 6, gap = 2, h = Math.round(w * 4 / 3), rowH = tileFullHeight(w) + gap;
     discards.forEach((t, i) => {
       const sp = makeTile(t, w);
-      const tx = x + (i % cols) * (w + gap), ty = y + Math.floor(i / cols) * (h + gap + 4);
+      const tx = x + (i % cols) * (w + gap), ty = y + Math.floor(i / cols) * rowH;
       sp.pos(tx, ty);
       if (curId != null && t.id === curId) sp.graphics.drawRect(0, 0, w, h, null, "#e7c46a", 2);
       this.root.addChild(sp);
@@ -161,21 +161,25 @@ export class TableView {
         : ["#d2882a", "#2a1a05"]; // chi/pon/kan
       btns.push(this.button(label, bg, fg, () => this.onDecide(a.id)));
     }
-    // lay out centered at bottom
+    // lay out at the bottom-right, above the hand (so they never sit over a pond)
     const gap = 14;
     const totalW = btns.reduce((s, b) => s + b.width, 0) + gap * (btns.length - 1);
-    let x = (DESIGN_W - totalW) / 2;
-    for (const b of btns) { b.pos(x, 748); this.root.addChild(b); x += b.width + gap; }
+    let x = DESIGN_W - 40 - totalW;
+    for (const b of btns) { b.pos(x, 730); this.root.addChild(b); x += b.width + gap; }
   }
 
   private button(label: string, bg: string, fg: string, onClick: () => void): Laya.Sprite {
+    // measure width from chars (Laya.Text.width isn't reliable synchronously): CJK≈fs, latin≈fs*0.55
+    const fs = 26, padX = 22, padY = 12;
+    let tw = 0;
+    for (const ch of label) tw += ch.charCodeAt(0) > 255 ? fs : Math.round(fs * 0.55);
+    const w = tw + padX * 2, h = fs + padY * 2;
     const b = new Laya.Sprite();
+    b.graphics.drawRoundRect(0, 0, w, h, 11, 11, 11, 11, bg);
     const t = new Laya.Text();
-    t.text = label; t.fontSize = 24; t.bold = true; t.color = fg;
-    const padX = 20, padY = 11;
-    const w = Math.ceil(t.width) + padX * 2, h = Math.ceil(t.height) + padY * 2;
-    b.graphics.drawRoundRect(0, 0, w, h, 10, 10, 10, 10, bg);
-    t.pos(padX, padY); b.addChild(t);
+    t.text = label; t.fontSize = fs; t.bold = true; t.color = fg;
+    t.width = tw; t.height = fs + 4; t.align = "center"; t.valign = "middle"; t.pos(padX, padY - 2);
+    b.addChild(t);
     b.size(w, h);
     b.on(Laya.Event.CLICK, this, onClick);
     return b;

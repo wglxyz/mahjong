@@ -34,38 +34,41 @@ export function preloadTiles(): Promise<any> {
   return Laya.loader.load(allTileNames().map((n) => ({ url: url(n), type: Laya.Loader.IMAGE })));
 }
 
-// Fake 3D using the Front silhouette (keeps rounded corners): a soft drop shadow
-// + a darker "lip" offset down for thickness, then the body, then the face.
+// Fake 2.5D like Mahjong Soul: a visible ivory bottom "side" (the tile's depth)
+// + a soft drop shadow under it, then the top body, then the face. Using the
+// Front silhouette for the side keeps the rounded corners consistent.
+// sideOf() is the extra height the depth adds — layout must leave room for it.
+export const sideOf = (w: number) => Math.max(4, Math.round(w * TILE_RATIO * 0.16));
+export const tileFullHeight = (w: number) => Math.round(w * TILE_RATIO) + sideOf(w);
+
 export function makeTile(t: TileView, w: number): Laya.Sprite {
   const h = Math.round(w * TILE_RATIO);
-  const lip = Math.max(2, Math.round(w * 0.07));
+  const side = sideOf(w);
   const sp = new Laya.Sprite();
   const g = sp.graphics;
   const front = Laya.loader.getRes(url("Front"));
   if (front) {
-    g.drawTexture(front, Math.round(w * 0.04), lip + 2, w, h, null, 0.3, "#000000");  // drop shadow
-    g.drawTexture(front, 0, lip, w, h, null, 1, "#b3a784");                            // thickness lip
-    g.drawTexture(front, 0, 0, w, h);                                                  // body
+    g.drawTexture(front, Math.round(w * 0.05), side + Math.round(side * 0.4), w, h, null, 0.32, "#000000"); // drop shadow
+    g.drawTexture(front, 0, side, w, h, null, 1, "#cdbf99");  // ivory side (depth), slightly darker
+    g.drawTexture(front, 0, 0, w, h);                          // top body
   }
   const face = Laya.loader.getRes(url(faceFile(t)));
   if (face) g.drawTexture(face, 0, 0, w, h);
-  sp.size(w, h + lip + 2);
+  sp.size(w, h + side);
   return sp;
 }
 
 export function makeBack(w: number): Laya.Sprite {
   const h = Math.round(w * TILE_RATIO);
-  const lip = Math.max(2, Math.round(w * 0.07));
+  const side = sideOf(w);
   const sp = new Laya.Sprite();
   const g = sp.graphics;
   const back = Laya.loader.getRes(url("Back"));
   if (back) {
-    g.drawTexture(back, Math.round(w * 0.04), lip + 2, w, h, null, 0.3, "#000000");
-    g.drawTexture(back, 0, lip, w, h, null, 1, "#0c3a2c");
+    g.drawTexture(back, Math.round(w * 0.05), side + Math.round(side * 0.4), w, h, null, 0.32, "#000000");
+    g.drawTexture(back, 0, side, w, h, null, 1, "#0a3024");
     g.drawTexture(back, 0, 0, w, h);
   }
-  sp.size(w, h + lip + 2);
+  sp.size(w, h + side);
   return sp;
 }
-
-export const tileSize = (w: number) => ({ w, h: Math.round(w * TILE_RATIO) });
