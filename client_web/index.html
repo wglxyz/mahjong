@@ -131,6 +131,9 @@
   button.act.call { background: linear-gradient(180deg, #f0b052, #d2882a); color: #2a1a05; }
   button.act.riichi { background: linear-gradient(180deg, #f4d764, #d6a92c); color: #2a1f04; }
   button.act.win { background: linear-gradient(180deg, #ef6b6b, #c0392b); animation: winGlow 1s ease-in-out infinite; }
+  button.act.riichi.armed { box-shadow: 0 0 0 3px #fff inset, 0 4px 0 rgba(0,0,0,.32), 0 0 16px rgba(244,215,100,.8); filter: brightness(1.12); }
+  .tile.dimmed { opacity: .32; filter: grayscale(.6); cursor: default !important; }
+  .station[data-rel="0"] .hand .tile.dimmed:hover { transform: none; }
   @keyframes winGlow { 0%,100% { box-shadow: 0 4px 0 rgba(0,0,0,.32), 0 0 12px rgba(232,90,90,.55); } 50% { box-shadow: 0 4px 0 rgba(0,0,0,.32), 0 0 24px rgba(232,90,90,.95); } }
   button.act .mini { display: inline-flex; gap: 3px; align-items: flex-end; }
   button.act .mini .tile { --w: 24px; margin-bottom: 3px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
@@ -234,7 +237,7 @@ const ABORT_NAMES = { nine_terminals:"九種九牌", four_winds:"四風連打", 
 const KIND_LABEL = { discard:"切", pass:"过", chi:"吃", pon:"碰", kan:"杠", tsumo:"自摸", ron:"荣和", riichi:"立直", abort:"流局" };
 
 let ws = null, yourSeat = 0, seatNames = ["E","S","W","N"], ruleset = "?";
-let snap = null, pendingActions = null, globalLastDiscard = null;
+let snap = null, pendingActions = null, globalLastDiscard = null, riichiArmed = false;
 const seenDiscardIds = new Set(), seenMeldKeys = new Set(), animatedDrawIds = new Set();
 let prevRiichi = {};
 
@@ -378,7 +381,10 @@ function renderHand(container, sv, seatNo, rel) {
     reconcile(container, items, t => "h"+t.id,
       t => { const el = makeTile(t); if (t.id===drawnId && !animatedDrawIds.has(t.id)) { animatedDrawIds.add(t.id); el.classList.add("anim-draw"); } return el; },
       (el,t) => { el.classList.toggle("drawn", t.id===drawnId);
-        const act = discardActionFor(t); el.classList.toggle("clickable", !!act); el.onclick = act ? () => decide(act.id) : null; });
+        const act = discardActionFor(t);
+        el.classList.toggle("clickable", !!act);
+        el.classList.toggle("dimmed", riichiArmed && !act);   // can't riichi-discard this tile
+        el.onclick = act ? () => decide(act.id) : null; });
   } else {
     const backs = Array.from({length: sv.hand_count||0}, (_,i)=>i);
     reconcile(container, backs, i => "b"+i, () => makeTile(null));
@@ -394,17 +400,40 @@ function renderPond(grid, sv, seatNo) {
 function sortHand(hand) { const order = {m:0,p:1,s:2,z:3};
   return [...hand].sort((a,b)=>{ const sa=order[a.code[0]], sb=order[b.code[0]]; return sa!==sb?sa-sb:(+a.code.slice(1))-(+b.code.slice(1)); }); }
 
-function discardActionFor(tile) { if (!pendingActions) return null;
-  return pendingActions.find(a => (a.kind==="discard"||a.kind==="riichi") && a.tiles && a.tiles.some(t => t.id===tile.id)); }
+// which action a hand-tile click performs: normal discard, or (when riichi is
+// armed) the riichi-discard tied to that tile.
+function discardActionFor(tile) {
+  if (!pendingActions) return null;
+  const kind = riichiArmed ? "riichi" : "discard";
+  return pendingActions.find(a => a.kind===kind && a.tiles && a.tiles.some(t => t.id===tile.id));
+}
 
+// Bottom bar holds ONLY special actions (chi/pon/kan/riichi/tsumo/ron/pass).
+// Discarding is done by clicking a tile in your hand (Mahjong-Soul style).
 function renderActions() {
-  const bar = document.getElementById("actionbar"); bar.innerHTML = "";
+  const bar = document.getElementById("actionbar"); bar.innerHTML = ""; riichiArmed = false;
   if (!pendingActions || !pendingActions.length) { bar.innerHTML = '<span class="hint">轮到对家 / AI…</span>'; cancelTimer(); return; }
-  pendingActions.forEach(a => {
+
+  const hasDiscard = pendingActions.some(a => a.kind==="discard");
+  const hasRiichi  = pendingActions.some(a => a.kind==="riichi");
+  const others = pendingActions.filter(a => a.kind!=="discard" && a.kind!=="riichi");
+
+  if (hasDiscard || hasRiichi) bar.appendChild(elc("span","hint","点击手牌出牌"));
+
+  if (hasRiichi) {
+    const rb = elc("button","act riichi"); rb.textContent = "立直";
+    rb.onclick = () => {
+      riichiArmed = !riichiArmed; rb.classList.toggle("armed", riichiArmed);
+      const h = bar.querySelector(".hint"); if (h) h.textContent = riichiArmed ? "选择要切出的牌 · 立直" : "点击手牌出牌";
+      render();
+    };
+    bar.appendChild(rb);
+  }
+
+  others.forEach(a => {
     const b = elc("button","act");
     if (a.kind==="pass") b.classList.add("pass");
     else if (a.kind==="tsumo"||a.kind==="ron") b.classList.add("win");
-    else if (a.kind==="riichi") b.classList.add("riichi");
     else if (a.kind==="chi"||a.kind==="pon"||a.kind==="kan") b.classList.add("call");
     let label = KIND_LABEL[a.kind] || a.kind;
     if (a.kind==="kan" && a.extra && a.extra.kan_kind) label += `(${a.extra.kan_kind})`;
@@ -415,7 +444,7 @@ function renderActions() {
   startTimerForDecision(bar);
 }
 function decide(actionId) {
-  cancelTimer(); send({type:"decide", action_id: actionId}); pendingActions = null;
+  cancelTimer(); riichiArmed = false; send({type:"decide", action_id: actionId}); pendingActions = null;
   document.getElementById("actionbar").innerHTML = '<span class="hint">已出招，等待…</span>'; render();
 }
 
