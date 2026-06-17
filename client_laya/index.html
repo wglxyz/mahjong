@@ -11,8 +11,11 @@
     background: rgba(0,0,0,.4); border-radius: 6px; padding: 6px 8px; }
   #log .row { white-space: pre-wrap; word-break: break-word; }
 </style>
-<!-- Laya engine core (global window.Laya), vendored from LayaAir 3.4 libs -->
+<!-- Laya engine (global window.Laya), vendored from LayaAir 3.4 libs.
+     core = engine; webgl_2D = the browser WebGL 2D render backend (registers
+     LayaGL.renderDeviceFactory — without it Laya.init throws on createEngine). -->
 <script src="/laya/libs/laya.core.js"></script>
+<script src="/laya/libs/laya.webgl_2D.js"></script>
 </head>
 <body>
   <div id="log"></div>
