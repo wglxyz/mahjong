@@ -30,9 +30,11 @@ async function main() {
   title.pos(40, 50);
   Laya.stage.addChild(title);
 
-  // load real tile SVGs (de-risks the asset pipeline under WebGL)
+  // load real tile SVGs. Laya's loader keys parsers off the file suffix and has
+  // no .svg parser ("unsupported suffix"), so force type=image — the image loader
+  // uses an <img>, which natively supports SVG.
   try {
-    await Laya.loader.load(TILES.map(url));
+    await Laya.loader.load(TILES.map((n) => ({ url: url(n), type: Laya.Loader.IMAGE })));
     log("tile assets loaded: " + TILES.length);
   } catch (e) {
     log("asset load error: " + e);
