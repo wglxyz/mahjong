@@ -551,7 +551,9 @@ document.getElementById("clearLog").onclick = () => { logEl.innerHTML = ""; };
 document.getElementById("logBtn").onclick = (e) => { const p = document.getElementById("logpanel"); p.classList.toggle("hidden"); e.target.textContent = p.classList.contains("hidden")?"显示日志":"隐藏日志"; };
 document.getElementById("overlay").onclick = (e) => { if (e.target.id==="overlay") hideOverlay(); };
 
-// ── one-time asset preload, then connect (no in-game tile loading) ──
+// ── asset preload ── show the loading bar only the FIRST time (or when the tile
+// pack changes). Bump ASSET_VERSION whenever the SVGs under /tiles/ are updated.
+const ASSET_VERSION = "fluffystuff-1";
 function allAssetUrls() {
   const names = new Set(["Front", "Back"]);
   for (const su of ["m","p","s"]) for (let r = 1; r <= 9; r++) names.add(FACE[su][r]);
@@ -565,11 +567,22 @@ function preloadAssets() {
   const bump = () => { done++; const p = Math.round(done/urls.length*100); fill.style.width = p+"%"; pct.textContent = p+"%"; };
   return Promise.all(urls.map(u => new Promise(res => { const img = new Image(); img.onload = img.onerror = () => { bump(); res(); }; img.src = u; })));
 }
-preloadAssets().then(() => {
-  const ld = document.getElementById("loading"); ld.classList.add("done");
-  setTimeout(() => { ld.style.display = "none"; }, 450);
+const ld = document.getElementById("loading");
+let cachedVer = null;
+try { cachedVer = localStorage.getItem("avid_assets_ver"); } catch {}
+if (cachedVer === ASSET_VERSION) {
+  // already downloaded this pack before → no loading bar; warm cache silently
+  ld.style.display = "none";
+  allAssetUrls().forEach(u => { const i = new Image(); i.src = u; });
   connect();
-});
+} else {
+  preloadAssets().then(() => {
+    try { localStorage.setItem("avid_assets_ver", ASSET_VERSION); } catch {}
+    ld.classList.add("done");
+    setTimeout(() => { ld.style.display = "none"; }, 450);
+    connect();
+  });
+}
 </script>
 </body>
 </html>
