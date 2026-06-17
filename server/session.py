@@ -6,6 +6,7 @@ Game engine runs in a daemon thread. Events flow:
 """
 from __future__ import annotations
 
+import os
 import queue
 import random as _random
 import threading
@@ -38,10 +39,20 @@ from server.ws_provider import WebSocketProvider
 class HouseAI:
     def __init__(self, seed: int) -> None:
         self._r = _random.Random(seed)
+        # Pace visible moves (discard/call/win) so a human can watch the game and
+        # the animations are visible; passes stay instant. Read at construction
+        # (after the server CLI sets the env); 0 in tests, which build App directly.
+        self._delay = float(os.environ.get("AVID_AI_DELAY", "0"))
 
     def choose(self, state, me, legal):
         from mahjong.actions import DiscardAction
         from mahjong.tile import SUIT_Z
+        action = self._pick(state, legal, DiscardAction, SUIT_Z)
+        if self._delay and not isinstance(action, PassAction):
+            time.sleep(self._delay)
+        return action
+
+    def _pick(self, state, legal, DiscardAction, SUIT_Z):
         for a in legal:
             if isinstance(a, DeclareWinAction):
                 return a

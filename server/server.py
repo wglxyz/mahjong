@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import gzip
 import json
+import os
 import logging
 import sys
 from pathlib import Path
@@ -160,10 +161,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--ruleset", choices=("simple", "riichi"), default="riichi")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--ai-delay", type=float, default=0.5,
+                        help="seconds the AI pauses before a visible move (discard/call), so the game is watchable")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=args.log_level)
+    os.environ["AVID_AI_DELAY"] = str(args.ai_delay)  # picked up by HouseAI
     app = App(ruleset_name=args.ruleset, seed=args.seed)
 
     async def run() -> None:

@@ -54,9 +54,11 @@ export class TableView {
     this.bg.removeChildren();
     this.ui.removeChildren();
 
-    // ── center well ──
+    // ── green felt + center well ──
     this.bg.graphics.clear();
-    this.bg.graphics.drawRect(510, 380, 260, 200, "#08281e", "#e7c46a55", 1);
+    this.bg.graphics.drawRect(0, 0, DESIGN_W, DESIGN_H, "#0e4d33");          // felt base
+    this.bg.graphics.drawRect(120, 90, DESIGN_W - 240, DESIGN_H - 180, "#16623f"); // lighter center field
+    this.bg.graphics.drawRect(510, 380, 260, 200, "#0c3f2a", "#e7c46a55", 1);
     this.text(this.bg, `${WINDS[snap.round_wind] || "?"} ${snap.hand_number}`, 560, 405, 30, "#e7c46a", true);
     this.text(this.bg, `山 ${snap.wall_count}   庄 ${WINDS[snap.dealer + 1] || snap.dealer}`, 545, 450, 18, "#9fc4b4");
     this.text(this.bg, "宝牌", 545, 488, 13, "#9fc4b4");
@@ -97,14 +99,21 @@ export class TableView {
 
     if (rel === 0) {
       this.text(this.bg, label, 40, 905, 18, labelColor, active);
-      const hand = sortHand(sv.hand || []);
-      const HW = 62, gap = 4;
-      const x0 = (DESIGN_W - hand.length * (HW + gap)) / 2;
+      // the just-drawn tile is held apart on the right (riichi convention), so it
+      // never overlaps a neighbour; the rest stay sorted.
       const drawnId = snap.last_drawn_tile?.id ?? null;
-      hand.forEach((t, i) => {
-        const drawn = t.id === drawnId;
-        placed.push({ key: "h" + t.id, tile: t, x: x0 + i * (HW + gap) + (drawn ? 14 : 0), y: 824, w: HW, kind: "hand", drawn, act: this.handActionFor(t) });
+      const rest = sortHand((sv.hand || []).filter((t) => t.id !== drawnId));
+      const drawnTile = (sv.hand || []).find((t) => t.id === drawnId) || null;
+      const HW = 62, gap = 4, sepGap = 26;
+      const n = rest.length + (drawnTile ? 1 : 0);
+      const totalW = n * (HW + gap) + (drawnTile ? sepGap : 0);
+      const x0 = (DESIGN_W - totalW) / 2;
+      rest.forEach((t, i) => {
+        placed.push({ key: "h" + t.id, tile: t, x: x0 + i * (HW + gap), y: 824, w: HW, kind: "hand", act: this.handActionFor(t) });
       });
+      if (drawnTile) {
+        placed.push({ key: "h" + drawnTile.id, tile: drawnTile, x: x0 + rest.length * (HW + gap) + sepGap, y: 824, w: HW, kind: "hand", drawn: true, act: this.handActionFor(drawnTile) });
+      }
     } else {
       const lp: Record<number, [number, number, number, number]> = { 2: [540, 24, 490, 52], 3: [24, 322, 36, 352], 1: [980, 322, 1216, 352] };
       const [lx, ly, bx, by] = lp[rel];

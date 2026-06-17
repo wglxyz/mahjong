@@ -54,13 +54,12 @@ export function makeTile(t: TileView, w: number): Laya.Sprite {
   const r = Math.max(3, Math.round(w * 0.1));
   const sp = new Laya.Sprite();
   const g = sp.graphics;
-  g.drawRoundRect(Math.round(w * 0.06), side + Math.round(side * 0.5), w, h, r, r, r, r, "#00000048");      // drop shadow
-  g.drawRoundRect(0, side, w, h, r, r, r, r, "#caa96a");                                                    // side wall (warm)
-  g.drawRoundRect(0, Math.round(side * 0.55), w, h, r, r, r, r, "#e7d39c");                                 // upper side highlight
+  g.drawRoundRect(Math.round(w * 0.05), side + Math.round(side * 0.5), w, h, r, r, r, r, "#00000040");      // drop shadow
+  g.drawRoundRect(0, side, w, h, r, r, r, r, "#cfc3a3");                                                    // ivory side = the tile's own depth
   const front = Laya.loader.getRes(url("Front"));
-  if (front) g.drawTexture(front, 0, 0, w, h);                                                              // top body
+  if (front) g.drawTexture(front, 0, 0, w, h);                                                              // top face body
   const face = Laya.loader.getRes(url(faceFile(t)));
-  if (face) g.drawTexture(face, 0, 0, w, h);                                                                // face
+  if (face) g.drawTexture(face, 0, 0, w, h);                                                                // printed face
   sp.size(w, h + side);
   return sp;
 }
