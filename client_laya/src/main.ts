@@ -48,6 +48,7 @@ function handle(m: ServerMsg) {
 }
 
 async function main() {
+  Laya.Config.useRetinalCanvas = true;  // sharp tiles on HiDPI / retina screens
   await Laya.init(DESIGN_W, DESIGN_H);
   Laya.stage.scaleMode = "showall";
   Laya.stage.alignH = "center";

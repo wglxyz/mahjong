@@ -80,9 +80,10 @@ export class TableView {
         const isDrawn = t.id === drawnId;
         sp.pos(x0 + i * (HW + gap) + (isDrawn ? 14 : 0), 824);
         if (t.id != null && discardable.has(t.id)) {
+          const baseY = sp.y;
           sp.on(Laya.Event.CLICK, this, () => this.onDiscard(t));
-          // subtle hint underline
-          sp.graphics.drawRect(0, Math.round(HW * 4 / 3) - 3, HW, 3, "#1f8a6d");
+          sp.on(Laya.Event.MOUSE_OVER, this, () => { sp.y = baseY - 14; });
+          sp.on(Laya.Event.MOUSE_OUT, this, () => { sp.y = baseY; });
         }
         this.root.addChild(sp);
       });
