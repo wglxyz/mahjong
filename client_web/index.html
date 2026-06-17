@@ -77,7 +77,14 @@
   .sc-dot.w3 { background: radial-gradient(circle at 35% 28%, #62a0dd, #2f6fb0); }
   .sc-dot.w4 { background: radial-gradient(circle at 35% 28%, #b095d8, #6f4fa0); }
   .scorechip.dealer .sc-dot { box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 1px rgba(255,255,255,.3); }
-  .scorechip .sc-pts { color: var(--gold); font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .scorechip .sc-pts { color: #f4efe0; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: .5px;
+    text-shadow: 1px 0 0 rgba(0,0,0,.6), -1px 0 0 rgba(0,0,0,.6), 0 1px 0 rgba(0,0,0,.6), 0 -1px 0 rgba(0,0,0,.6), 0 0 5px rgba(0,0,0,.4);
+    transition: color .25s, text-shadow .25s; }
+  .scorechip.gain .sc-pts { color: #87e6a0; text-shadow: 0 0 9px rgba(135,230,160,.9), 1px 0 0 rgba(0,0,0,.5), -1px 0 0 rgba(0,0,0,.5); }
+  .scorechip.loss .sc-pts { color: #ff8c7a; text-shadow: 0 0 9px rgba(255,140,122,.9), 1px 0 0 rgba(0,0,0,.5), -1px 0 0 rgba(0,0,0,.5); }
+  .scorechip.gain .sc-pts, .scorechip.loss .sc-pts { animation: ptsPop .35s ease-out; }
+  @keyframes ptsPop { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1); } }
+  .scorechip.me { border-color: rgba(231,196,106,.45); }
   .scorechip .sc-rii { color: var(--red); font-weight: 800; font-size: 13px; }
   /* each chip is centered on a point just outside one well edge; side chips are
      rotated (like their player's station) so they don't reach into the pond */
@@ -185,6 +192,41 @@
   .card .yaku div { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.08); padding: 3px 0; }
   .card .big { font-size: 32px; color: var(--ink); margin: 10px 0; font-variant-numeric: tabular-nums; }
   .card table { width: 100%; font-variant-numeric: tabular-nums; margin-top: 8px; } .card td { padding: 2px 6px; }
+
+  /* rotate hint (portrait phones) */
+  #rotateHint { display: none; position: absolute; inset: 0; z-index: 70; flex-direction: column; gap: 10px;
+    align-items: center; justify-content: center; background: rgba(6,28,22,.92); color: var(--ink); text-align: center; }
+  #rotateHint .rot { font-size: 46px; animation: rotSpin 2s ease-in-out infinite; }
+  #rotateHint small { color: var(--muted); }
+  @keyframes rotSpin { 0%,100% { transform: rotate(-12deg); } 50% { transform: rotate(78deg); } }
+
+  /* ── mobile / touch layout (Mahjong-Soul-style: landscape, table fills screen) ── */
+  @media (max-width: 900px), (pointer: coarse) {
+    header { padding: 4px 8px; gap: 8px; min-height: 0; }
+    header h1 { font-size: 13px; }
+    header .info { display: none; }                 /* ws url / verbose info — info lives in the well */
+    header label, header button.ctl { font-size: 12px; padding: 4px 9px; }
+    #playarea { padding: 3px; }
+    .felt { width: min(100%, calc(100vh - 92px)); }
+    /* log panel becomes a slide-over drawer (hidden by default via JS on mobile) */
+    #logpanel:not(.hidden) { position: fixed; top: 0; right: 0; bottom: 0; width: min(88%, 340px); z-index: 60; box-shadow: -4px 0 22px rgba(0,0,0,.55); }
+    /* scale tiles to the viewport so a full hand fits one row */
+    .tile { --w: 3.4vmin; }
+    .pond .tile, .melds .tile { --w: 3.3vmin; }
+    .station[data-rel="0"] .hand .tile { --w: 6vmin; }
+    .station:not([data-rel="0"]) .hand .tile { --w: 3vmin; }
+    .well .deadwall .tile { --w: 2.6vmin; }
+    button.act .mini .tile { --w: 4vmin; }
+    .well { width: 30%; }
+    .well .wround { font-size: 3vmin; } .well .wcount { font-size: 2.2vmin; } .well .wlbl { font-size: 1.6vmin; }
+    .scorechip { padding: 2px 8px 2px 3px; gap: 4px; }
+    .scorechip .sc-pts { font-size: 2.5vmin; }
+    .scorechip .sc-dot { width: 4vmin; height: 4vmin; font-size: 2.3vmin; }
+    #actionbar { min-height: 52px; padding: 7px 10px; gap: 8px; }
+    button.act { padding: 9px 15px; font-size: 14px; }
+    .fuse { width: 130px; }
+  }
+  @media (pointer: coarse) and (orientation: portrait) { #rotateHint.on { display: flex; } }
 </style>
 </head>
 <body>
@@ -222,6 +264,7 @@
     </div>
     <div id="actionbar"><span class="hint">等待连接…</span></div>
     <div id="overlay"><div class="card" id="overlayCard"></div></div>
+    <div id="rotateHint"><div class="rot">📱</div><div>横屏体验更佳</div><small>（点此忽略）</small></div>
     <div id="loading"><div class="loadbox">
       <div class="loadtitle">🀄 加载牌面资源…</div>
       <div class="loadbar"><div class="loadfill" id="loadfill"></div></div>
@@ -260,6 +303,8 @@ const KIND_LABEL = { discard:"切", pass:"过", chi:"吃", pon:"碰", kan:"杠",
 let ws = null, yourSeat = 0, seatNames = ["E","S","W","N"], ruleset = "?";
 let snap = null, pendingActions = null, globalLastDiscard = null, riichiArmed = false;
 let reserveMs = RESERVE_FULL_MS;   // long-think pool, refilled each hand
+const ptsShown = {};               // seat -> currently displayed score (for change tween)
+const scoreTweens = {};            // seat -> active rAF id
 const seenDiscardIds = new Set(), seenMeldKeys = new Set(), animatedDrawIds = new Set();
 let prevRiichi = {};
 
@@ -293,6 +338,7 @@ function handle(msg) {
     case "welcome":
       yourSeat = msg.your_seat; seatNames = msg.seats; ruleset = msg.ruleset;
       seenDiscardIds.clear(); seenMeldKeys.clear(); animatedDrawIds.clear(); globalLastDiscard = null; prevRiichi = {}; reserveMs = RESERVE_FULL_MS;
+      for (const k in ptsShown) delete ptsShown[k]; for (const k in scoreTweens) delete scoreTweens[k];
       setTimeout(() => send({type:"request_snapshot"}), 150); break;
     case "snapshot": snap = msg; render(); break;
     case "event": applyEvent(msg.event); render(); break;
@@ -380,14 +426,37 @@ function renderScoreChip(b, sv, seatNo) {
   b.classList.toggle("dealer", snap.dealer===seatNo);
   if (sv && sv.riichi && !prevRiichi[seatNo]) { b.classList.remove("anim-riichi"); void b.offsetWidth; b.classList.add("anim-riichi"); }
   if (sv) prevRiichi[seatNo] = sv.riichi;
-  b.innerHTML = "";
-  if (!sv) return;
+  if (!sv) { b.innerHTML = ""; b._built = false; return; }
   const sw = ((seatNo - snap.dealer + 4)%4)+1;
-  b.appendChild(elc("div","sc-dot w"+sw, WINDS[sw]));
-  b.appendChild(elc("span","sc-pts", sv.points));
-  if (seatNo===yourSeat) b.appendChild(elc("span","sc-rii","你")), b.lastChild.style.color = "var(--muted)";
-  if (sv.riichi) b.appendChild(elc("span","sc-rii","立"));
-  b.title = sv.name;
+  if (!b._built) {  // build stable structure once so the score span survives re-renders (tween)
+    b.innerHTML = "";
+    b._dot = elc("div","sc-dot"); b._pts = elc("span","sc-pts"); b._rii = elc("span","sc-rii","立");
+    b.append(b._dot, b._pts); b._built = true;
+  }
+  b._dot.className = "sc-dot w"+sw; b._dot.textContent = WINDS[sw];
+  b.classList.toggle("me", seatNo===yourSeat);
+  b.title = sv.name + (seatNo===yourSeat ? "（你）" : "");
+  if (sv.riichi && b._rii.parentNode !== b) b.appendChild(b._rii);
+  else if (!sv.riichi && b._rii.parentNode === b) b.removeChild(b._rii);
+
+  const shown = ptsShown[seatNo];
+  if (shown == null) { b._pts.textContent = sv.points; ptsShown[seatNo] = sv.points; }
+  else if (shown !== sv.points && !scoreTweens[seatNo]) { tweenScore(b, b._pts, seatNo, shown, sv.points); }
+  else if (!scoreTweens[seatNo]) { b._pts.textContent = sv.points; }
+}
+// roll the score from old → new, flashing green (gain) / red (loss)
+function tweenScore(chip, span, seatNo, from, to) {
+  const dur = 650, start = performance.now();
+  chip.classList.remove("gain","loss"); void chip.offsetWidth;
+  chip.classList.add(to > from ? "gain" : "loss");
+  ptsShown[seatNo] = to;
+  function step(now) {
+    const p = Math.min(1, (now-start)/dur), e = 1-Math.pow(1-p,3);
+    span.textContent = Math.round(from + (to-from)*e);
+    if (p < 1) { scoreTweens[seatNo] = requestAnimationFrame(step); }
+    else { span.textContent = to; delete scoreTweens[seatNo]; setTimeout(() => chip.classList.remove("gain","loss"), 300); }
+  }
+  scoreTweens[seatNo] = requestAnimationFrame(step);
 }
 
 function renderMelds(container, sv, seatNo) {
@@ -552,6 +621,16 @@ document.getElementById("reconnectBtn").onclick = () => { if (ws) try { ws.close
 document.getElementById("clearLog").onclick = () => { logEl.innerHTML = ""; };
 document.getElementById("logBtn").onclick = (e) => { const p = document.getElementById("logpanel"); p.classList.toggle("hidden"); e.target.textContent = p.classList.contains("hidden")?"显示日志":"隐藏日志"; };
 document.getElementById("overlay").onclick = (e) => { if (e.target.id==="overlay") hideOverlay(); };
+
+// mobile: hide the debug log drawer by default; show a one-time rotate hint in portrait
+const isMobile = window.matchMedia("(max-width: 900px), (pointer: coarse)").matches;
+if (isMobile) {
+  const lp = document.getElementById("logpanel"); lp.classList.add("hidden");
+  document.getElementById("logBtn").textContent = "显示日志";
+  const rh = document.getElementById("rotateHint");
+  rh.classList.add("on");
+  rh.onclick = () => rh.classList.remove("on");
+}
 
 // ── asset preload ── show the loading bar only the FIRST time (or when the tile
 // pack changes). Bump ASSET_VERSION whenever the SVGs under /tiles/ are updated.
