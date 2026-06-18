@@ -7,6 +7,10 @@ const log = (s: string) => { const d = document.createElement("div"); d.textCont
 
 async function main() {
   const t0 = performance.now();
+  // anti-aliasing: WebGL MSAA context + render at device pixel ratio (capped)
+  Laya.Config.isAntialias = true;
+  Laya.Config.useRetinalCanvas = true;
+  Laya.Config3D.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   await Laya.init(window.innerWidth, window.innerHeight);
   Laya.stage.scaleMode = "fixedauto";
   Laya.stage.bgColor = "#0b352a";
@@ -21,6 +25,7 @@ async function main() {
   camera.clearFlag = Laya.CameraClearFlags.SolidColor;
   camera.clearColor = new Laya.Color(0.04, 0.22, 0.16, 1);
   camera.fieldOfView = 45;
+  camera.msaa = true;          // per-camera multisample anti-aliasing
 
   // green felt table
   const ground = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(20, 0.4, 14))) as Laya.MeshSprite3D;
