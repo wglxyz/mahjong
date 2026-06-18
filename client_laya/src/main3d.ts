@@ -8,7 +8,7 @@ const DEBUG_SINGLE = false;
 
 // real riichi tile ~ 20(W) x 28(H) x 16(D) mm. amber body (BD) + a thin real
 // WHITE front block (FD) on top — the white must be a 3D block, not a flat decal.
-const TW = 0.70, TH = 0.98, FD = 0.06, BD = 0.50, TT = FD + BD, R = 0.08, SEG = 4, BEV = 0.04, EDGE = 5.4, LEAN = 40;
+const TW = 0.70, TH = 0.98, FD = 0.10, BD = 0.46, TT = FD + BD, R = 0.08, SEG = 4, BEV = 0.04, EDGE = 5.4, LEAN = 40;
 const GAP = 0.06;  // small gap between hand tiles (like Mahjong Soul)
 
 const FACE: Record<string, string[]> = {
@@ -102,7 +102,7 @@ function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceC
   if (faceCode) {
     const white = new Laya.MeshSprite3D(whiteMesh) as Laya.MeshSprite3D;            // real thin white block
     white.meshRenderer.sharedMaterial = whiteMat;
-    white.transform.localPosition = new Laya.Vector3(0, 0, (BD + FD) / 2);
+    white.transform.localPosition = new Laya.Vector3(0, 0, (BD + FD) / 2 + 0.004);
     sp.addChild(white);
     const sym = new Laya.MeshSprite3D(symMesh) as Laya.MeshSprite3D;
     sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
@@ -189,7 +189,7 @@ async function main() {
   else { camera.transform.position = new Laya.Vector3(0, 7.8, 9.2); camera.transform.rotationEuler = new Laya.Vector3(-43, 0, 0); camera.fieldOfView = 52; }
 
   amberMesh = roundedTileMesh(TW, TH, BD, R, SEG, BEV);                 // amber body
-  whiteMesh = roundedTileMesh(TW * 0.93, TH * 0.94, FD, R, SEG, 0.02);  // thin white front block (slightly inset -> amber rim)
+  whiteMesh = roundedTileMesh(TW, TH, FD, R, SEG, BEV);  // FULL-size white front block (edge flush -> white side band shows)
   symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.74, TH * 0.74);
   amberMat = new Laya.BlinnPhongMaterial(); amberMat.albedoColor = new Laya.Color(0.91, 0.71, 0.37, 1);  // amber body/sides
   amberMat.specularColor = new Laya.Color(1, 1, 1, 1); amberMat.shininess = 0.5;
