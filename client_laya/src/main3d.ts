@@ -13,23 +13,26 @@ let scene: Laya.Scene3D;
 let standMesh: Laya.Mesh, flatMesh: Laya.Mesh;
 let ivory: Laya.UnlitMaterial, ivoryBack: Laya.UnlitMaterial;
 
-function tile(mat: Laya.UnlitMaterial, flat: boolean, x: number, z: number, rotY: number) {
+function tile(mat: Laya.UnlitMaterial, flat: boolean, x: number, y: number, z: number, rotX: number, rotY: number) {
   const sp = scene.addChild(new Laya.MeshSprite3D(flat ? flatMesh : standMesh)) as Laya.MeshSprite3D;
   sp.meshRenderer.sharedMaterial = mat;
-  sp.transform.position = new Laya.Vector3(x, flat ? TT / 2 : TH / 2, z);
-  if (rotY) sp.transform.rotationEuler = new Laya.Vector3(0, rotY, 0);
+  sp.transform.position = new Laya.Vector3(x, y, z);
+  if (rotX || rotY) sp.transform.rotationEuler = new Laya.Vector3(rotX, rotY, 0);
   return sp;
 }
 
-// a hand of `n` standing tiles centered along an edge; rel 0=you(near,+Z) 1=right 2=far 3=left
+// LEAN: how far a hand reclines toward its player (faces the camera, Mahjong-Soul style)
+const LEAN = 52;
+// a hand of `n` standing-but-reclined tiles centered along an edge; rel 0=you 1=right 2=far 3=left
 function hand(rel: number, n: number, mat: Laya.UnlitMaterial) {
   const span = (n - 1) * (TW + 0.04);
+  const y = TH / 2 * Math.cos(LEAN * Math.PI / 180) + 0.05;  // sit reclined tiles on the felt
   for (let i = 0; i < n; i++) {
     const off = -span / 2 + i * (TW + 0.04);
-    if (rel === 0) tile(mat, false, off, EDGE, 0);
-    else if (rel === 2) tile(mat, false, -off, -EDGE, 180);
-    else if (rel === 1) tile(mat, false, EDGE, -off, 90);
-    else tile(mat, false, -EDGE, off, 90);
+    if (rel === 0) tile(mat, false, off, y, EDGE, -LEAN, 0);        // recline toward camera (you)
+    else if (rel === 2) tile(mat, false, -off, y, -EDGE, LEAN, 180); // recline away (backs)
+    else if (rel === 1) tile(mat, false, EDGE, y, -off, -LEAN, 90);  // toward right player
+    else tile(mat, false, -EDGE, y, off, -LEAN, -90);                // toward left player
   }
 }
 
@@ -40,10 +43,11 @@ function pond(rel: number, n: number) {
     const c = i % cols, r = Math.floor(i / cols);
     const lat = (c - (cols - 1) / 2) * cw;   // sideways
     const dep = near + r * rh;                // toward the player from center
-    if (rel === 0) tile(ivory, true, lat, dep, 0);
-    else if (rel === 2) tile(ivory, true, -lat, -dep, 0);
-    else if (rel === 1) tile(ivory, true, dep, -lat, 90);
-    else tile(ivory, true, -dep, lat, 90);
+    const y = TT / 2;
+    if (rel === 0) tile(ivory, true, lat, y, dep, 0, 0);
+    else if (rel === 2) tile(ivory, true, -lat, y, -dep, 0, 0);
+    else if (rel === 1) tile(ivory, true, dep, y, -lat, 0, 90);
+    else tile(ivory, true, -dep, y, lat, 0, 90);
   }
 }
 
@@ -59,11 +63,12 @@ async function main() {
 
   scene = Laya.stage.addChild(new Laya.Scene3D()) as Laya.Scene3D;
 
-  // high top-down camera (Mahjong-Soul-ish)
+  // Mahjong-Soul camera: lower angle (behind/above you) so your near hand shows
+  // its FACES, not just the top edge. (~42° down rather than a steep top-down.)
   const camera = scene.addChild(new Laya.Camera(0, 0.1, 200)) as Laya.Camera;
-  camera.transform.position = new Laya.Vector3(0, 13, 8.2);
-  camera.transform.rotationEuler = new Laya.Vector3(-60, 0, 0);
-  camera.fieldOfView = 42;
+  camera.transform.position = new Laya.Vector3(0, 8.6, 10);
+  camera.transform.rotationEuler = new Laya.Vector3(-42, 0, 0);
+  camera.fieldOfView = 50;
   camera.clearFlag = Laya.CameraClearFlags.SolidColor;
   camera.clearColor = new Laya.Color(0.04, 0.11, 0.18, 1);
   camera.msaa = true;
