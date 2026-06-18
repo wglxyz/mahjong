@@ -1,13 +1,11 @@
-// Laya 3D mahjong table — step 1b: textured tile faces.
-// Tiles are ivory 3D boxes with a face-image quad on the visible side (front for
-// your reclined hand, top for flat discards). Sample tiles for now; real data later.
+// Laya 3D mahjong table — lighting + opponent backs + walls + framing + center text.
+// Sample tiles for now; real WS data is a later step.
 
 const logEl = document.getElementById("log")!;
 const log = (s: string) => { const d = document.createElement("div"); d.textContent = s; logEl.appendChild(d); };
 
-const TW = 0.70, TH = 0.96, TT = 0.16, EDGE = 5.4, LEAN = 52;
+const TW = 0.70, TH = 0.96, TT = 0.18, EDGE = 5.0, WALL = 5.85, LEAN = 52;
 
-// face-file mapping (same art as the 2D client)
 const FACE: Record<string, string[]> = {
   m: ["", "Man1", "Man2", "Man3", "Man4", "Man5", "Man6", "Man7", "Man8", "Man9"],
   p: ["", "Pin1", "Pin2", "Pin3", "Pin4", "Pin5", "Pin6", "Pin7", "Pin8", "Pin9"],
@@ -17,7 +15,6 @@ const FACE: Record<string, string[]> = {
 const faceFile = (code: string) => (FACE[code[0]] || [])[+code.slice(1)] || "Front";
 const url = (name: string) => `/laya/tiles/${name}.svg?v=lay340`;
 
-// sample data (until real WS data in step 3)
 const MY_HAND = ["m1", "m2", "m3", "p3", "p4", "p5", "s6", "s7", "s8", "z1", "z1", "z6", "z6"];
 const PONDS = [
   ["m9", "p2", "z3", "s1", "z5", "p8", "m4", "s9"],
@@ -28,25 +25,24 @@ const PONDS = [
 
 let scene: Laya.Scene3D;
 let standMesh: Laya.Mesh, flatMesh: Laya.Mesh, quadMesh: Laya.Mesh;
-let ivory: Laya.UnlitMaterial, ivoryBack: Laya.UnlitMaterial;
-const matCache = new Map<string, Laya.UnlitMaterial>();
+let bodyMat: Laya.BlinnPhongMaterial, backMat: Laya.BlinnPhongMaterial;
+const faceCache = new Map<string, Laya.UnlitMaterial>();
 
 function faceMat(name: string): Laya.UnlitMaterial {
-  let m = matCache.get(name);
+  let m = faceCache.get(name);
   if (m) return m;
   m = new Laya.UnlitMaterial();
   const tex = Laya.loader.getRes(url(name)) as Laya.Texture;
   if (tex && tex.bitmap) m.albedoTexture = tex.bitmap;
   m.albedoColor = new Laya.Color(1, 1, 1, 1);
   m.renderMode = Laya.UnlitMaterial.RENDERMODE_TRANSPARENT;
-  matCache.set(name, m);
+  faceCache.set(name, m);
   return m;
 }
 
-// a tile body + optional face quad on its visible side
-function tile(bodyMat: Laya.UnlitMaterial, flat: boolean, x: number, y: number, z: number, rotX: number, rotY: number, faceCode?: string) {
+function tile(mat: Laya.BlinnPhongMaterial, flat: boolean, x: number, y: number, z: number, rotX: number, rotY: number, faceCode?: string) {
   const sp = scene.addChild(new Laya.MeshSprite3D(flat ? flatMesh : standMesh)) as Laya.MeshSprite3D;
-  sp.meshRenderer.sharedMaterial = bodyMat;
+  sp.meshRenderer.sharedMaterial = mat;
   sp.transform.position = new Laya.Vector3(x, y, z);
   if (rotX || rotY) sp.transform.rotationEuler = new Laya.Vector3(rotX, rotY, 0);
   if (faceCode) {
@@ -66,10 +62,10 @@ function hand(rel: number, codes: string[] | number) {
   for (let i = 0; i < n; i++) {
     const off = -span / 2 + i * (TW + 0.04);
     const code = typeof codes === "number" ? undefined : codes[i];
-    if (rel === 0) tile(ivory, false, off, yLean, EDGE, -LEAN, 0, code);   // you: reclined, faces up
-    else if (rel === 2) tile(ivoryBack, false, -off, TH / 2, -EDGE, 0, 180);
-    else if (rel === 1) tile(ivoryBack, false, EDGE, TH / 2, -off, 0, 90);
-    else tile(ivoryBack, false, -EDGE, TH / 2, off, 0, 90);
+    if (rel === 0) tile(bodyMat, false, off, yLean, EDGE, -LEAN, 0, code);  // you: reclined faces
+    else if (rel === 2) tile(backMat, false, -off, TH / 2, -EDGE, 0, 0);     // opponents: back-textured box
+    else if (rel === 1) tile(backMat, false, EDGE, TH / 2, -off, 0, 90);
+    else tile(backMat, false, -EDGE, TH / 2, off, 0, 90);
   }
 }
 
@@ -77,14 +73,40 @@ function pond(rel: number, codes: string[]) {
   const cols = 6, cw = TW + 0.03, rh = TH + 0.03, near = 2.0;
   codes.forEach((code, i) => {
     const c = i % cols, r = Math.floor(i / cols);
-    const lat = (c - (cols - 1) / 2) * cw;
-    const dep = near + r * rh;
-    const y = TT / 2;
-    if (rel === 0) tile(ivory, true, lat, y, dep, 0, 0, code);
-    else if (rel === 2) tile(ivory, true, -lat, y, -dep, 0, 0, code);
-    else if (rel === 1) tile(ivory, true, dep, y, -lat, 0, 90, code);
-    else tile(ivory, true, -dep, y, lat, 0, 90, code);
+    const lat = (c - (cols - 1) / 2) * cw, dep = near + r * rh, y = TT / 2;
+    if (rel === 0) tile(bodyMat, true, lat, y, dep, 0, 0, code);
+    else if (rel === 2) tile(bodyMat, true, -lat, y, -dep, 0, 0, code);
+    else if (rel === 1) tile(bodyMat, true, dep, y, -lat, 0, 90, code);
+    else tile(bodyMat, true, -dep, y, lat, 0, 90, code);
   });
+}
+
+// perimeter wall: a 2-high ridge of back-tiles along each edge
+function walls() {
+  const count = 17, step = TW + 0.02, start = -(count - 1) / 2 * step;
+  for (let i = 0; i < count; i++) {
+    const o = start + i * step;
+    for (let layer = 0; layer < 2; layer++) {
+      const y = TT / 2 + layer * TT;
+      tile(backMat, true, o, y, WALL, 0, 0);
+      tile(backMat, true, -o, y, -WALL, 0, 0);
+      tile(backMat, true, WALL, y, o, 0, 90);
+      tile(backMat, true, -WALL, y, -o, 0, 90);
+    }
+  }
+}
+
+function overlay() {
+  const cx = Laya.stage.width / 2, cy = Laya.stage.height / 2;
+  const lab = (t: string, x: number, y: number, size: number, color: string) => {
+    const tx = new Laya.Text(); tx.text = t; tx.fontSize = size; tx.color = color; tx.bold = true;
+    tx.align = "center"; tx.width = 160; tx.pos(x - 80, y); Laya.stage.addChild(tx);
+  };
+  lab("東 1 局", cx, cy - 12, 22, "#e7c46a");
+  lab("25000", cx, cy + 70, 16, "#f2efe6");   // you (bottom)
+  lab("25000", cx, cy - 78, 16, "#f2efe6");   // far (top)
+  lab("25000", cx + 90, cy - 6, 16, "#f2efe6"); // right
+  lab("25000", cx - 90, cy - 6, 16, "#f2efe6"); // left
 }
 
 async function main() {
@@ -96,43 +118,54 @@ async function main() {
   Laya.stage.scaleMode = "fixedauto";
   Laya.stage.bgColor = "#0a1d2e";
 
-  // preload all tile face textures we use (+ Back) via the proven image loader
   const names = new Set<string>(["Front", "Back"]);
   [...MY_HAND, ...PONDS.flat()].forEach((c) => names.add(faceFile(c)));
   try { await Laya.loader.load([...names].map((n) => ({ url: url(n), type: Laya.Loader.IMAGE }))); log(`textures: ${names.size} (${(performance.now() - t0).toFixed(0)}ms)`); }
   catch (e) { log("texture load err: " + e); }
 
   scene = Laya.stage.addChild(new Laya.Scene3D()) as Laya.Scene3D;
+  // generous ambient so lit materials can never go black, + one directional light for sheen
+  scene.ambientMode = Laya.AmbientMode.SolidColor;
+  scene.ambientColor = new Laya.Color(0.62, 0.63, 0.66, 1);
+  scene.ambientIntensity = 1;
+  const lightNode = scene.addChild(new Laya.Sprite3D()) as Laya.Sprite3D;
+  const dl = lightNode.addComponent(Laya.DirectionLightCom);
+  dl.color = new Laya.Color(1, 0.97, 0.9, 1); dl.intensity = 1.1;
+  lightNode.transform.rotationEuler = new Laya.Vector3(-55, 25, 0);
+
   const camera = scene.addChild(new Laya.Camera(0, 0.1, 200)) as Laya.Camera;
-  camera.transform.position = new Laya.Vector3(0, 8.6, 10);
-  camera.transform.rotationEuler = new Laya.Vector3(-42, 0, 0);
-  camera.fieldOfView = 50;
+  camera.transform.position = new Laya.Vector3(0, 7.8, 9.2);
+  camera.transform.rotationEuler = new Laya.Vector3(-43, 0, 0);
+  camera.fieldOfView = 52;
   camera.clearFlag = Laya.CameraClearFlags.SolidColor;
   camera.clearColor = new Laya.Color(0.04, 0.11, 0.18, 1);
   camera.msaa = true;
 
   standMesh = Laya.PrimitiveMesh.createBox(TW, TH, TT);
   flatMesh = Laya.PrimitiveMesh.createBox(TW, TT, TH);
-  quadMesh = Laya.PrimitiveMesh.createQuad(TW, TH);
-  ivory = new Laya.UnlitMaterial(); ivory.albedoColor = new Laya.Color(0.95, 0.92, 0.81, 1);
-  ivoryBack = new Laya.UnlitMaterial(); ivoryBack.albedoColor = new Laya.Color(0.88, 0.85, 0.74, 1);
+  quadMesh = Laya.PrimitiveMesh.createQuad(TW * 0.84, TH * 0.84);   // smaller → ivory border shows (H)
+  bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.96, 0.93, 0.82, 1);
+  backMat = new Laya.BlinnPhongMaterial();
+  const backTex = Laya.loader.getRes(url("Back")) as Laya.Texture;
+  if (backTex && backTex.bitmap) backMat.albedoTexture = backTex.bitmap;
+  backMat.albedoColor = new Laya.Color(1, 1, 1, 1);
 
-  const felt = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(14, 0.4, 14))) as Laya.MeshSprite3D;
+  const felt = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(12.6, 0.4, 12.6))) as Laya.MeshSprite3D;
   felt.transform.position = new Laya.Vector3(0, -0.2, 0);
-  const feltMat = new Laya.UnlitMaterial(); feltMat.albedoColor = new Laya.Color(0.10, 0.22, 0.34, 1);
+  const feltMat = new Laya.BlinnPhongMaterial(); feltMat.albedoColor = new Laya.Color(0.10, 0.22, 0.34, 1);
   felt.meshRenderer.sharedMaterial = feltMat;
 
-  // center info block (round wind / scores go on its faces later — structural for now)
   const cube = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(2.0, 0.5, 2.0))) as Laya.MeshSprite3D;
   cube.transform.position = new Laya.Vector3(0, 0.25, 0);
-  const cubeMat = new Laya.UnlitMaterial(); cubeMat.albedoColor = new Laya.Color(0.05, 0.10, 0.15, 1);
+  const cubeMat = new Laya.BlinnPhongMaterial(); cubeMat.albedoColor = new Laya.Color(0.05, 0.10, 0.15, 1);
   cube.meshRenderer.sharedMaterial = cubeMat;
 
-  hand(0, MY_HAND);
-  hand(1, 13); hand(2, 13); hand(3, 13);
+  walls();
+  hand(0, MY_HAND); hand(1, 13); hand(2, 13); hand(3, 13);
   PONDS.forEach((codes, rel) => pond(rel, codes));
+  overlay();
 
-  log("3D table 1b: textured faces (your hand + ponds), opponents ivory");
+  log("3D table: lighting + backs + walls + framing + center text");
 }
 
 main().catch((e) => log("ERR " + (e?.message || e)));
