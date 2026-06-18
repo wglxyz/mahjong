@@ -88,10 +88,10 @@ function walls() {
     const o = start + i * step;
     for (let layer = 0; layer < 2; layer++) {
       const y = TT / 2 + layer * TT;
-      tile(backMat, true, o, y, WALL, 0, 0);
-      tile(backMat, true, -o, y, -WALL, 0, 0);
-      tile(backMat, true, WALL, y, o, 0, 90);
-      tile(backMat, true, -WALL, y, -o, 0, 90);
+      tile(bodyMat, true, o, y, WALL, 0, 0);     // walls are ivory (tile bodies seen from outside)
+      tile(bodyMat, true, -o, y, -WALL, 0, 0);
+      tile(bodyMat, true, WALL, y, o, 0, 90);
+      tile(bodyMat, true, -WALL, y, -o, 0, 90);
     }
   }
 }
@@ -145,10 +145,8 @@ async function main() {
   flatMesh = Laya.PrimitiveMesh.createBox(TW, TT, TH);
   quadMesh = Laya.PrimitiveMesh.createQuad(TW * 0.84, TH * 0.84);   // smaller → ivory border shows (H)
   bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.96, 0.93, 0.82, 1);
-  backMat = new Laya.BlinnPhongMaterial();
-  const backTex = Laya.loader.getRes(url("Back")) as Laya.Texture;
-  if (backTex && backTex.bitmap) backMat.albedoTexture = backTex.bitmap;
-  backMat.albedoColor = new Laya.Color(1, 1, 1, 1);
+  // opponent backs: teal solid (the FluffyStuff Back.svg is a red back — too loud);
+  backMat = new Laya.BlinnPhongMaterial(); backMat.albedoColor = new Laya.Color(0.17, 0.45, 0.42, 1);
 
   const felt = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(12.6, 0.4, 12.6))) as Laya.MeshSprite3D;
   felt.transform.position = new Laya.Vector3(0, -0.2, 0);
