@@ -8,7 +8,7 @@ const DEBUG_SINGLE = false;
 
 // tile = thin cream FRONT plate (FD) + amber BACK block (BD); thinner & two-tone
 const TW = 0.70, TH = 0.93, FD = 0.10, BD = 0.14, TT = FD + BD, R = 0.07, SEG = 4, BEV = 0.03, EDGE = 5.0, LEAN = 40;
-const GAP = 0.005;  // hand tiles nearly touch so their sides stay hidden
+const GAP = 0.06;  // small gap between hand tiles (like Mahjong Soul)
 
 const FACE: Record<string, string[]> = {
   m: ["", "Man1", "Man2", "Man3", "Man4", "Man5", "Man6", "Man7", "Man8", "Man9"],
