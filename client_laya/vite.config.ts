@@ -10,8 +10,8 @@ export default defineConfig({
     target: "es2020",
     rollupOptions: {
       input: {
-        main: new URL("./index.html", import.meta.url).pathname,        // 2D board
-        d3: new URL("./index3d.html", import.meta.url).pathname,        // 3D spike
+        main: new URL("./index.html", import.meta.url).pathname,        // 3D table (default /laya/)
+        twod: new URL("./index2d.html", import.meta.url).pathname,      // 2D board (/laya/index2d.html)
       },
     },
   },

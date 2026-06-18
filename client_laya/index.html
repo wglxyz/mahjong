@@ -3,30 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Avid Mahjong — Laya</title>
+<title>Avid Mahjong — Laya 3D spike</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b352a; overflow: hidden; }
   #log { position: fixed; left: 8px; bottom: 8px; right: 8px; max-height: 24%; overflow-y: auto;
     font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #8fd; z-index: 10;
     background: rgba(0,0,0,.4); border-radius: 6px; padding: 6px 8px; }
-  #log .row { white-space: pre-wrap; word-break: break-word; }
-  /* first-load resource bar; skipped (instant) once the pack is cached */
-  #boot { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 12px; background: radial-gradient(circle at 50% 40%, #1a6b52, #0b352a);
-    color: #e7c46a; font: 16px -apple-system, "PingFang SC", system-ui, sans-serif; transition: opacity .35s; }
-  #boot.hide { opacity: 0; pointer-events: none; }
-  #boot .bar { width: 280px; height: 12px; border-radius: 6px; background: rgba(0,0,0,.4); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(231,196,106,.3); }
-  #boot .fill { height: 100%; width: 0%; background: linear-gradient(90deg, #b9863a, #e7c46a); transition: width .15s; }
-  #boot .pct { color: #9fc4b4; font-size: 12px; }
 </style>
-<!-- Laya engine (global window.Laya). The ?v= lets us cache these hard (immutable)
-     yet bust them by bumping the version when the engine is updated. -->
+<!-- 3D needs: core engine + 2D backend (for UI) + 3D backend + the d3 module -->
 <script defer src="/laya/libs/laya.core.js?v=lay340"></script>
 <script defer src="/laya/libs/laya.webgl_2D.js?v=lay340"></script>
+<script defer src="/laya/libs/laya.d3.js?v=lay340"></script>
+<script defer src="/laya/libs/laya.webgl_3D.js?v=lay340"></script>
 </head>
 <body>
-  <div id="boot"><div>🀄 加载资源包…</div><div class="bar"><div class="fill" id="bootFill"></div></div><div class="pct" id="bootPct">0%</div></div>
   <div id="log"></div>
-  <script type="module" src="/src/main.ts"></script>
+  <script type="module" src="/src/main3d.ts"></script>
 </body>
 </html>
