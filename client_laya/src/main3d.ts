@@ -7,7 +7,7 @@ const log = (s: string) => { const d = document.createElement("div"); d.textCont
 const DEBUG_SINGLE = false;
 
 // real-tile proportions ~ width:height:depth = 3:4:2; rounded corners
-const TW = 0.70, TH = 0.93, TT = 0.44, R = 0.07, SEG = 4, EDGE = 5.0, LEAN = 52;
+const TW = 0.70, TH = 0.93, TT = 0.44, R = 0.07, SEG = 4, BEV = 0.06, EDGE = 5.0, LEAN = 52;
 
 const FACE: Record<string, string[]> = {
   m: ["", "Man1", "Man2", "Man3", "Man4", "Man5", "Man6", "Man7", "Man8", "Man9"],
@@ -31,33 +31,44 @@ let tileMesh: Laya.Mesh, panelMesh: Laya.Mesh, symMesh: Laya.Mesh;
 let bodyMat: Laya.BlinnPhongMaterial, frontMat: Laya.UnlitMaterial;
 const faceCache = new Map<string, Laya.UnlitMaterial>();
 
-// rounded-rectangle prism (face in XY at ±depth/2, front normal +Z), built from
-// raw vertices via the same internal createBox/createQuad uses.
-function roundedTileMesh(w: number, h: number, d: number, r: number, seg: number): Laya.Mesh {
+// rounded-rect outline points (CCW), 4*(seg+1) of them
+function rr(hw: number, hh: number, r: number, seg: number): [number, number][] {
+  const cs: [number, number, number][] = [[hw - r, hh - r, 0], [-(hw - r), hh - r, 90], [-(hw - r), -(hh - r), 180], [hw - r, -(hh - r), 270]];
+  const out: [number, number][] = [];
+  for (const [cx, cy, a0] of cs) for (let i = 0; i <= seg; i++) { const a = (a0 + i * (90 / seg)) * Math.PI / 180; out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  return out;
+}
+
+// rounded tile with a chamfered FRONT edge: inset front cap (+hd) -> bevel ring ->
+// side wall -> back cap. The bevel kills the "sharp block" look.
+function roundedTileMesh(w: number, h: number, d: number, r: number, seg: number, bev: number): Laya.Mesh {
   const hw = w / 2, hh = h / 2, hd = d / 2;
-  const corners: [number, number, number][] = [[hw - r, hh - r, 0], [-(hw - r), hh - r, 90], [-(hw - r), -(hh - r), 180], [hw - r, -(hh - r), 270]];
-  const peri: [number, number][] = [];
-  for (const [cx, cy, a0] of corners)
-    for (let i = 0; i <= seg; i++) { const a = (a0 + i * (90 / seg)) * Math.PI / 180; peri.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
-  const P = peri.length;
+  const pOut = rr(hw, hh, r, seg), pIn = rr(hw - bev, hh - bev, Math.max(0.02, r - bev), seg);
+  const P = pOut.length;
   const v: number[] = [], idx: number[] = []; let n = 0;
   const add = (x: number, y: number, z: number, nx: number, ny: number, nz: number, u: number, vv: number) => { v.push(x, y, z, nx, ny, nz, u, vv, 1, 0, 0, 1); return n++; };
+  const nrm = (x: number, y: number) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l] as [number, number]; };
 
+  // inset front cap at +hd
   const fc = add(0, 0, hd, 0, 0, 1, 0.5, 0.5);
-  const fr: number[] = peri.map(([x, y]) => add(x, y, hd, 0, 0, 1, x / w + 0.5, 0.5 - y / h));
+  const fr = pIn.map(([x, y]) => add(x, y, hd, 0, 0, 1, x / w + 0.5, 0.5 - y / h));
   for (let i = 0; i < P; i++) idx.push(fc, fr[i], fr[(i + 1) % P]);
 
+  // front bevel ring: pIn@+hd -> pOut@(+hd-bev), diagonal normals
+  const beIn = pIn.map(([x, y]) => { const [nx, ny] = nrm(x, y); return add(x, y, hd, nx * 0.5, ny * 0.5, 0.7, 0, 0); });
+  const beOut = pOut.map(([x, y]) => { const [nx, ny] = nrm(x, y); return add(x, y, hd - bev, nx * 0.5, ny * 0.5, 0.7, 1, 0); });
+  for (let i = 0; i < P; i++) { const j = (i + 1) % P; idx.push(beIn[i], beOut[i], beIn[j], beIn[j], beOut[i], beOut[j]); }
+
+  // side wall: pOut@(+hd-bev) -> pOut@-hd
+  const sT = pOut.map(([x, y]) => { const [nx, ny] = nrm(x, y); return add(x, y, hd - bev, nx, ny, 0, 0, 0); });
+  const sB = pOut.map(([x, y]) => { const [nx, ny] = nrm(x, y); return add(x, y, -hd, nx, ny, 0, 1, 1); });
+  for (let i = 0; i < P; i++) { const j = (i + 1) % P; idx.push(sT[i], sB[i], sT[j], sT[j], sB[i], sB[j]); }
+
+  // back cap at -hd
   const bc = add(0, 0, -hd, 0, 0, -1, 0.5, 0.5);
-  const br: number[] = peri.map(([x, y]) => add(x, y, -hd, 0, 0, -1, x / w + 0.5, 0.5 - y / h));
+  const br = pOut.map(([x, y]) => add(x, y, -hd, 0, 0, -1, x / w + 0.5, 0.5 - y / h));
   for (let i = 0; i < P; i++) idx.push(bc, br[(i + 1) % P], br[i]);
 
-  for (let i = 0; i < P; i++) {
-    const j = (i + 1) % P, [x0, y0] = peri[i], [x1, y1] = peri[j];
-    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, ml = Math.hypot(mx, my) || 1, nx = mx / ml, ny = my / ml;
-    const a = add(x0, y0, hd, nx, ny, 0, 0, 0), b = add(x1, y1, hd, nx, ny, 0, 1, 0);
-    const c = add(x0, y0, -hd, nx, ny, 0, 0, 1), e = add(x1, y1, -hd, nx, ny, 0, 1, 1);
-    idx.push(a, c, b, b, c, e);
-  }
   const decl = (Laya as any).VertexMesh.getVertexDeclaration("POSITION,NORMAL,UV,TANGENT");
   return (Laya.PrimitiveMesh as any)._createMesh(decl, new Float32Array(v), new Uint16Array(idx));
 }
@@ -168,10 +179,11 @@ async function main() {
   if (DEBUG_SINGLE) { camera.transform.position = new Laya.Vector3(0, 1.7, 3.4); camera.transform.rotationEuler = new Laya.Vector3(-20, 0, 0); camera.fieldOfView = 45; }
   else { camera.transform.position = new Laya.Vector3(0, 7.8, 9.2); camera.transform.rotationEuler = new Laya.Vector3(-43, 0, 0); camera.fieldOfView = 52; }
 
-  tileMesh = roundedTileMesh(TW, TH, TT, R, SEG);
-  panelMesh = Laya.PrimitiveMesh.createQuad(TW * 0.9, TH * 0.92);
-  symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.76, TH * 0.76);
+  tileMesh = roundedTileMesh(TW, TH, TT, R, SEG, BEV);
+  panelMesh = Laya.PrimitiveMesh.createQuad(TW * 0.82, TH * 0.84);
+  symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.72, TH * 0.72);
   bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.93, 0.85, 0.62, 1);
+  bodyMat.specularColor = new Laya.Color(1, 1, 1, 1); bodyMat.shininess = 0.55;  // gloss
   bodyMat.cull = Laya.RenderState.CULL_NONE;   // double-sided: tolerant of mesh winding
   frontMat = new Laya.UnlitMaterial();
   const frontTex = Laya.loader.getRes(url("Front")) as Laya.Texture;
