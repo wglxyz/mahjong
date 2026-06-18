@@ -21,18 +21,19 @@ function tile(mat: Laya.UnlitMaterial, flat: boolean, x: number, y: number, z: n
   return sp;
 }
 
-// LEAN: how far a hand reclines toward its player (faces the camera, Mahjong-Soul style)
+// LEAN: how far YOUR hand reclines toward the camera (Mahjong-Soul style).
+// Opponents stay upright for now (the side-lean needs a different rotation axis;
+// combining rotX with a 90° yaw skews them — revisit later).
 const LEAN = 52;
-// a hand of `n` standing-but-reclined tiles centered along an edge; rel 0=you 1=right 2=far 3=left
 function hand(rel: number, n: number, mat: Laya.UnlitMaterial) {
   const span = (n - 1) * (TW + 0.04);
-  const y = TH / 2 * Math.cos(LEAN * Math.PI / 180) + 0.05;  // sit reclined tiles on the felt
+  const yLean = TH / 2 * Math.cos(LEAN * Math.PI / 180) + 0.05;
   for (let i = 0; i < n; i++) {
     const off = -span / 2 + i * (TW + 0.04);
-    if (rel === 0) tile(mat, false, off, y, EDGE, -LEAN, 0);        // recline toward camera (you)
-    else if (rel === 2) tile(mat, false, -off, y, -EDGE, LEAN, 180); // recline away (backs)
-    else if (rel === 1) tile(mat, false, EDGE, y, -off, -LEAN, 90);  // toward right player
-    else tile(mat, false, -EDGE, y, off, -LEAN, -90);                // toward left player
+    if (rel === 0) tile(mat, false, off, yLean, EDGE, -LEAN, 0);   // you: reclined toward camera
+    else if (rel === 2) tile(mat, false, -off, TH / 2, -EDGE, 0, 180); // upright backs
+    else if (rel === 1) tile(mat, false, EDGE, TH / 2, -off, 0, 90);
+    else tile(mat, false, -EDGE, TH / 2, off, 0, 90);
   }
 }
 
