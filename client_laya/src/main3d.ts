@@ -6,8 +6,8 @@ const log = (s: string) => { const d = document.createElement("div"); d.textCont
 
 const DEBUG_SINGLE = false;
 
-// tile = thin cream FRONT plate (FD) + amber BACK block (BD); thinner & two-tone
-const TW = 0.70, TH = 0.93, FD = 0.12, BD = 0.14, TT = FD + BD, R = 0.07, SEG = 4, BEV = 0.0, EDGE = 5.0, LEAN = 40;
+// real riichi tile ~ 20(W) x 28(H) x 16(D) mm; face is white, body (sides+back) amber
+const TW = 0.70, TH = 0.98, TT = 0.56, R = 0.08, SEG = 4, BEV = 0.05, EDGE = 5.4, LEAN = 40;
 const GAP = 0.06;  // small gap between hand tiles (like Mahjong Soul)
 
 const FACE: Record<string, string[]> = {
@@ -28,7 +28,7 @@ const PONDS = [
 ];
 
 let scene: Laya.Scene3D;
-let backMesh: Laya.Mesh, frontMesh: Laya.Mesh, oppMesh: Laya.Mesh, symMesh: Laya.Mesh;
+let tileMesh: Laya.Mesh, faceQuadMesh: Laya.Mesh, symMesh: Laya.Mesh;
 let amberMat: Laya.BlinnPhongMaterial, whiteMat: Laya.UnlitMaterial;
 const faceCache = new Map<string, Laya.UnlitMaterial>();
 
@@ -91,22 +91,24 @@ function faceMat(name: string): Laya.UnlitMaterial {
 // every tile = amber back block (parent) + white front block; symbol on the
 // front when faceCode is given. (Opponents get no symbol and are turned so the
 // amber back faces the camera, with the white rim showing around it.)
+// amber tile body + (if faced) a WHITE face panel + symbol on the front (+Z local).
+// White face vs amber sides gives the colour contrast that reads as thickness.
 function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceCode?: string) {
-  const back = scene.addChild(new Laya.MeshSprite3D(backMesh)) as Laya.MeshSprite3D;
-  back.meshRenderer.sharedMaterial = amberMat;
-  back.transform.position = new Laya.Vector3(x, y, z);
-  back.transform.rotationEuler = new Laya.Vector3(rotX, rotY, 0);
-  const front = new Laya.MeshSprite3D(frontMesh) as Laya.MeshSprite3D;
-  front.meshRenderer.sharedMaterial = whiteMat;
-  front.transform.localPosition = new Laya.Vector3(0, 0, (BD + FD) / 2);
-  back.addChild(front);
+  const sp = scene.addChild(new Laya.MeshSprite3D(tileMesh)) as Laya.MeshSprite3D;
+  sp.meshRenderer.sharedMaterial = amberMat;
+  sp.transform.position = new Laya.Vector3(x, y, z);
+  sp.transform.rotationEuler = new Laya.Vector3(rotX, rotY, 0);
   if (faceCode) {
+    const face = new Laya.MeshSprite3D(faceQuadMesh) as Laya.MeshSprite3D;
+    face.meshRenderer.sharedMaterial = whiteMat;
+    face.transform.localPosition = new Laya.Vector3(0, 0, TT / 2 + 0.006);
+    sp.addChild(face);
     const sym = new Laya.MeshSprite3D(symMesh) as Laya.MeshSprite3D;
     sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
-    sym.transform.localPosition = new Laya.Vector3(0, 0, FD / 2 + 0.006);
-    front.addChild(sym);
+    sym.transform.localPosition = new Laya.Vector3(0, 0, TT / 2 + 0.010);
+    sp.addChild(sym);
   }
-  return back;
+  return sp;
 }
 
 function hand(rel: number, codes: string[] | number) {
@@ -185,14 +187,13 @@ async function main() {
   if (DEBUG_SINGLE) { camera.transform.position = new Laya.Vector3(0, 1.7, 3.4); camera.transform.rotationEuler = new Laya.Vector3(-20, 0, 0); camera.fieldOfView = 45; }
   else { camera.transform.position = new Laya.Vector3(0, 7.8, 9.2); camera.transform.rotationEuler = new Laya.Vector3(-43, 0, 0); camera.fieldOfView = 52; }
 
-  backMesh = roundedTileMesh(TW, TH, BD, R, SEG, 0);       // amber back block
-  frontMesh = roundedTileMesh(TW, TH, FD, R, SEG, BEV);    // cream front plate (beveled front)
-  oppMesh = roundedTileMesh(TW, TH, TT, R, SEG, BEV);      // opponents: one amber tile
+  tileMesh = roundedTileMesh(TW, TH, TT, R, SEG, BEV);     // amber tile body
+  faceQuadMesh = Laya.PrimitiveMesh.createQuad(TW * 0.86, TH * 0.88);  // white face panel
   symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.74, TH * 0.74);
-  amberMat = new Laya.BlinnPhongMaterial(); amberMat.albedoColor = new Laya.Color(0.93, 0.72, 0.38, 1);  // orange-amber
+  amberMat = new Laya.BlinnPhongMaterial(); amberMat.albedoColor = new Laya.Color(0.91, 0.71, 0.37, 1);  // amber body/sides
   amberMat.specularColor = new Laya.Color(1, 1, 1, 1); amberMat.shininess = 0.5;
   amberMat.cull = Laya.RenderState.CULL_NONE;
-  whiteMat = new Laya.UnlitMaterial(); whiteMat.albedoColor = new Laya.Color(0.97, 0.96, 0.90, 1);       // cream-white face
+  whiteMat = new Laya.UnlitMaterial(); whiteMat.albedoColor = new Laya.Color(0.98, 0.97, 0.93, 1);       // bright white face (contrast vs amber)
   whiteMat.cull = Laya.RenderState.CULL_NONE;
 
   if (DEBUG_SINGLE) { buildSingle(); log("single-tile view"); return; }
