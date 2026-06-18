@@ -4,7 +4,11 @@
 const logEl = document.getElementById("log")!;
 const log = (s: string) => { const d = document.createElement("div"); d.textContent = s; logEl.appendChild(d); };
 
-const TW = 0.70, TH = 0.96, TT = 0.18, EDGE = 5.0, WALL = 5.85, LEAN = 52;
+// Single-tile tuning view: a few big tiles to perfect thickness / body / back
+// color before touching the whole table. Flip to false for the full table.
+const DEBUG_SINGLE = true;
+
+const TW = 0.70, TH = 0.96, TT = 0.26, EDGE = 5.0, WALL = 5.85, LEAN = 52;
 
 const FACE: Record<string, string[]> = {
   m: ["", "Man1", "Man2", "Man3", "Man4", "Man5", "Man6", "Man7", "Man8", "Man9"],
@@ -96,6 +100,14 @@ function walls() {
   }
 }
 
+// single-tile tuning: a face tile, a back tile, an honor tile — upright, big
+function buildSingle() {
+  const y = TH / 2;
+  tile(bodyMat, false, -0.85, y, 0, 0, 0, "m5");  // number face
+  tile(backMat, false, 0, y, 0, 0, 0);            // back (teal)
+  tile(bodyMat, false, 0.85, y, 0, 0, 0, "z7");   // honor face (中)
+}
+
 function overlay() {
   const cx = Laya.stage.width / 2, cy = Laya.stage.height / 2;
   const lab = (t: string, x: number, y: number, size: number, color: string) => {
@@ -124,22 +136,30 @@ async function main() {
   catch (e) { log("texture load err: " + e); }
 
   scene = Laya.stage.addChild(new Laya.Scene3D()) as Laya.Scene3D;
-  // generous ambient so lit materials can never go black, + one directional light for sheen
+  // even, neutral ambient dominates so a tile looks the SAME colour at any
+  // orientation (fixes "my hand white but center yellow"); soft directional just
+  // adds a little sheen.
   scene.ambientMode = Laya.AmbientMode.SolidColor;
-  scene.ambientColor = new Laya.Color(0.62, 0.63, 0.66, 1);
+  scene.ambientColor = new Laya.Color(0.78, 0.78, 0.78, 1);
   scene.ambientIntensity = 1;
   const lightNode = scene.addChild(new Laya.Sprite3D()) as Laya.Sprite3D;
   const dl = lightNode.addComponent(Laya.DirectionLightCom);
-  dl.color = new Laya.Color(1, 0.97, 0.9, 1); dl.intensity = 1.1;
-  lightNode.transform.rotationEuler = new Laya.Vector3(-55, 25, 0);
+  dl.color = new Laya.Color(1, 1, 1, 1); dl.intensity = 0.45;
+  lightNode.transform.rotationEuler = new Laya.Vector3(-60, 20, 0);
 
   const camera = scene.addChild(new Laya.Camera(0, 0.1, 200)) as Laya.Camera;
-  camera.transform.position = new Laya.Vector3(0, 7.8, 9.2);
-  camera.transform.rotationEuler = new Laya.Vector3(-43, 0, 0);
-  camera.fieldOfView = 52;
   camera.clearFlag = Laya.CameraClearFlags.SolidColor;
   camera.clearColor = new Laya.Color(0.04, 0.11, 0.18, 1);
   camera.msaa = true;
+  if (DEBUG_SINGLE) {
+    camera.transform.position = new Laya.Vector3(0, 1.7, 3.4);
+    camera.transform.rotationEuler = new Laya.Vector3(-20, 0, 0);
+    camera.fieldOfView = 45;
+  } else {
+    camera.transform.position = new Laya.Vector3(0, 7.8, 9.2);
+    camera.transform.rotationEuler = new Laya.Vector3(-43, 0, 0);
+    camera.fieldOfView = 52;
+  }
 
   standMesh = Laya.PrimitiveMesh.createBox(TW, TH, TT);
   flatMesh = Laya.PrimitiveMesh.createBox(TW, TT, TH);
@@ -147,6 +167,12 @@ async function main() {
   bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.96, 0.93, 0.82, 1);
   // opponent backs: teal solid (the FluffyStuff Back.svg is a red back — too loud);
   backMat = new Laya.BlinnPhongMaterial(); backMat.albedoColor = new Laya.Color(0.17, 0.45, 0.42, 1);
+
+  if (DEBUG_SINGLE) {
+    buildSingle();
+    log("single-tile tuning view");
+    return;
+  }
 
   const felt = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(12.6, 0.4, 12.6))) as Laya.MeshSprite3D;
   felt.transform.position = new Laya.Vector3(0, -0.2, 0);
