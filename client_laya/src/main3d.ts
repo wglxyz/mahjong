@@ -4,11 +4,9 @@
 const logEl = document.getElementById("log")!;
 const log = (s: string) => { const d = document.createElement("div"); d.textContent = s; logEl.appendChild(d); };
 
-// Single-tile tuning view: a few big tiles to perfect thickness / body / back
-// color before touching the whole table. Flip to false for the full table.
-const DEBUG_SINGLE = true;
+const DEBUG_SINGLE = false;   // full table
 
-const TW = 0.70, TH = 0.96, TT = 0.26, EDGE = 5.0, WALL = 5.85, LEAN = 52;
+const TW = 0.70, TH = 0.96, TT = 0.30, EDGE = 5.0, WALL = 5.85, LEAN = 52;
 
 const FACE: Record<string, string[]> = {
   m: ["", "Man1", "Man2", "Man3", "Man4", "Man5", "Man6", "Man7", "Man8", "Man9"],
@@ -28,8 +26,8 @@ const PONDS = [
 ];
 
 let scene: Laya.Scene3D;
-let standMesh: Laya.Mesh, flatMesh: Laya.Mesh, quadMesh: Laya.Mesh;
-let bodyMat: Laya.BlinnPhongMaterial, backMat: Laya.BlinnPhongMaterial;
+let standMesh: Laya.Mesh, flatMesh: Laya.Mesh, panelMesh: Laya.Mesh, symMesh: Laya.Mesh;
+let bodyMat: Laya.BlinnPhongMaterial, frontMat: Laya.UnlitMaterial;
 const faceCache = new Map<string, Laya.UnlitMaterial>();
 
 function faceMat(name: string): Laya.UnlitMaterial {
@@ -50,11 +48,19 @@ function tile(mat: Laya.BlinnPhongMaterial, flat: boolean, x: number, y: number,
   sp.transform.position = new Laya.Vector3(x, y, z);
   if (rotX || rotY) sp.transform.rotationEuler = new Laya.Vector3(rotX, rotY, 0);
   if (faceCode) {
-    const q = new Laya.MeshSprite3D(quadMesh) as Laya.MeshSprite3D;
-    q.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
-    if (flat) { q.transform.localRotationEuler = new Laya.Vector3(-90, 0, 0); q.transform.localPosition = new Laya.Vector3(0, TT / 2 + 0.01, 0); }
-    else { q.transform.localPosition = new Laya.Vector3(0, 0, TT / 2 + 0.01); }
-    sp.addChild(q);
+    // two-tone tile: cream Front panel + symbol on top, over the amber body
+    const panel = new Laya.MeshSprite3D(panelMesh) as Laya.MeshSprite3D;
+    panel.meshRenderer.sharedMaterial = frontMat;
+    const sym = new Laya.MeshSprite3D(symMesh) as Laya.MeshSprite3D;
+    sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
+    if (flat) {
+      panel.transform.localRotationEuler = new Laya.Vector3(-90, 0, 0); panel.transform.localPosition = new Laya.Vector3(0, TT / 2 + 0.008, 0);
+      sym.transform.localRotationEuler = new Laya.Vector3(-90, 0, 0); sym.transform.localPosition = new Laya.Vector3(0, TT / 2 + 0.012, 0);
+    } else {
+      panel.transform.localPosition = new Laya.Vector3(0, 0, TT / 2 + 0.008);
+      sym.transform.localPosition = new Laya.Vector3(0, 0, TT / 2 + 0.012);
+    }
+    sp.addChild(panel); sp.addChild(sym);
   }
   return sp;
 }
@@ -67,9 +73,9 @@ function hand(rel: number, codes: string[] | number) {
     const off = -span / 2 + i * (TW + 0.04);
     const code = typeof codes === "number" ? undefined : codes[i];
     if (rel === 0) tile(bodyMat, false, off, yLean, EDGE, -LEAN, 0, code);  // you: reclined faces
-    else if (rel === 2) tile(backMat, false, -off, TH / 2, -EDGE, 0, 0);     // opponents: back-textured box
-    else if (rel === 1) tile(backMat, false, EDGE, TH / 2, -off, 0, 90);
-    else tile(backMat, false, -EDGE, TH / 2, off, 0, 90);
+    else if (rel === 2) tile(bodyMat, false, -off, TH / 2, -EDGE, 0, 0);     // opponents: back-textured box
+    else if (rel === 1) tile(bodyMat, false, EDGE, TH / 2, -off, 0, 90);
+    else tile(bodyMat, false, -EDGE, TH / 2, off, 0, 90);
   }
 }
 
@@ -104,7 +110,7 @@ function walls() {
 function buildSingle() {
   const y = TH / 2;
   tile(bodyMat, false, -0.85, y, 0, 0, 0, "m5");  // number face
-  tile(backMat, false, 0, y, 0, 0, 0);            // back (teal)
+  tile(bodyMat, false, 0, y, 0, 0, 0);            // back (teal)
   tile(bodyMat, false, 0.85, y, 0, 0, 0, "z7");   // honor face (中)
 }
 
@@ -163,10 +169,15 @@ async function main() {
 
   standMesh = Laya.PrimitiveMesh.createBox(TW, TH, TT);
   flatMesh = Laya.PrimitiveMesh.createBox(TW, TT, TH);
-  quadMesh = Laya.PrimitiveMesh.createQuad(TW * 0.84, TH * 0.84);   // smaller → ivory border shows (H)
-  bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.96, 0.93, 0.82, 1);
-  // opponent backs: teal solid (the FluffyStuff Back.svg is a red back — too loud);
-  backMat = new Laya.BlinnPhongMaterial(); backMat.albedoColor = new Laya.Color(0.17, 0.45, 0.42, 1);
+  panelMesh = Laya.PrimitiveMesh.createQuad(TW * 0.95, TH * 0.95);  // cream face panel
+  symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.80, TH * 0.80);    // symbol
+  // Real riichi / Mahjong-Soul tiles: cream face, AMBER-YELLOW body (sides + back).
+  bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.90, 0.77, 0.47, 1);
+  frontMat = new Laya.UnlitMaterial();
+  const frontTex = Laya.loader.getRes(url("Front")) as Laya.Texture;
+  if (frontTex && frontTex.bitmap) frontMat.albedoTexture = frontTex.bitmap;
+  frontMat.albedoColor = new Laya.Color(1, 1, 1, 1);
+  frontMat.renderMode = Laya.UnlitMaterial.RENDERMODE_TRANSPARENT;
 
   if (DEBUG_SINGLE) {
     buildSingle();
