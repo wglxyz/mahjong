@@ -122,6 +122,12 @@ async function main() {
   const feltMat = new Laya.UnlitMaterial(); feltMat.albedoColor = new Laya.Color(0.10, 0.22, 0.34, 1);
   felt.meshRenderer.sharedMaterial = feltMat;
 
+  // center info block (round wind / scores go on its faces later — structural for now)
+  const cube = scene.addChild(new Laya.MeshSprite3D(Laya.PrimitiveMesh.createBox(2.0, 0.5, 2.0))) as Laya.MeshSprite3D;
+  cube.transform.position = new Laya.Vector3(0, 0.25, 0);
+  const cubeMat = new Laya.UnlitMaterial(); cubeMat.albedoColor = new Laya.Color(0.05, 0.10, 0.15, 1);
+  cube.meshRenderer.sharedMaterial = cubeMat;
+
   hand(0, MY_HAND);
   hand(1, 13); hand(2, 13); hand(3, 13);
   PONDS.forEach((codes, rel) => pond(rel, codes));
