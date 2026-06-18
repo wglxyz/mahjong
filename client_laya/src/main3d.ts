@@ -7,7 +7,7 @@ const log = (s: string) => { const d = document.createElement("div"); d.textCont
 const DEBUG_SINGLE = false;
 
 // tile = thin cream FRONT plate (FD) + amber BACK block (BD); thinner & two-tone
-const TW = 0.70, TH = 0.93, FD = 0.10, BD = 0.14, TT = FD + BD, R = 0.07, SEG = 4, BEV = 0.03, EDGE = 5.0, LEAN = 40;
+const TW = 0.70, TH = 0.93, FD = 0.12, BD = 0.14, TT = FD + BD, R = 0.07, SEG = 4, BEV = 0.0, EDGE = 5.0, LEAN = 40;
 const GAP = 0.06;  // small gap between hand tiles (like Mahjong Soul)
 
 const FACE: Record<string, string[]> = {
@@ -88,14 +88,10 @@ function faceMat(name: string): Laya.UnlitMaterial {
 
 // faced tile = amber back block (parent) + cream front plate + symbol on its front
 // (+Z local). Opponents (no face) = a single amber tile.
+// every tile = amber back block (parent) + white front block; symbol on the
+// front when faceCode is given. (Opponents get no symbol and are turned so the
+// amber back faces the camera, with the white rim showing around it.)
 function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceCode?: string) {
-  if (!faceCode) {
-    const o = scene.addChild(new Laya.MeshSprite3D(oppMesh)) as Laya.MeshSprite3D;
-    o.meshRenderer.sharedMaterial = amberMat;
-    o.transform.position = new Laya.Vector3(x, y, z);
-    o.transform.rotationEuler = new Laya.Vector3(rotX, rotY, 0);
-    return o;
-  }
   const back = scene.addChild(new Laya.MeshSprite3D(backMesh)) as Laya.MeshSprite3D;
   back.meshRenderer.sharedMaterial = amberMat;
   back.transform.position = new Laya.Vector3(x, y, z);
@@ -104,10 +100,12 @@ function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceC
   front.meshRenderer.sharedMaterial = whiteMat;
   front.transform.localPosition = new Laya.Vector3(0, 0, (BD + FD) / 2);
   back.addChild(front);
-  const sym = new Laya.MeshSprite3D(symMesh) as Laya.MeshSprite3D;
-  sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
-  sym.transform.localPosition = new Laya.Vector3(0, 0, FD / 2 + 0.006);
-  front.addChild(sym);
+  if (faceCode) {
+    const sym = new Laya.MeshSprite3D(symMesh) as Laya.MeshSprite3D;
+    sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
+    sym.transform.localPosition = new Laya.Vector3(0, 0, FD / 2 + 0.006);
+    front.addChild(sym);
+  }
   return back;
 }
 
@@ -118,9 +116,9 @@ function hand(rel: number, codes: string[] | number) {
   for (let i = 0; i < n; i++) {
     const off = -span / 2 + i * (TW + GAP);
     const code = typeof codes === "number" ? undefined : codes[i];
-    if (rel === 0) tile(off, yLean, EDGE, -LEAN, 0, code);    // you: reclined, face up toward camera
-    else if (rel === 2) tile(-off, TH / 2, -EDGE, 0, 0);      // opponents: upright amber (backs)
-    else if (rel === 1) tile(EDGE, TH / 2, -off, 0, 90);
+    if (rel === 0) tile(off, yLean, EDGE, -LEAN, 0, code);    // you: reclined, face toward camera
+    else if (rel === 2) tile(-off, TH / 2, -EDGE, 0, 180);    // far: white faces away → amber back to us
+    else if (rel === 1) tile(EDGE, TH / 2, -off, 0, -90);
     else tile(-EDGE, TH / 2, off, 0, 90);
   }
 }
