@@ -7,7 +7,8 @@ const log = (s: string) => { const d = document.createElement("div"); d.textCont
 const DEBUG_SINGLE = false;
 
 // tile = thin cream FRONT plate (FD) + amber BACK block (BD); thinner & two-tone
-const TW = 0.70, TH = 0.93, FD = 0.07, BD = 0.16, TT = FD + BD, R = 0.07, SEG = 4, BEV = 0.05, EDGE = 5.0, LEAN = 40;
+const TW = 0.70, TH = 0.93, FD = 0.10, BD = 0.14, TT = FD + BD, R = 0.07, SEG = 4, BEV = 0.03, EDGE = 5.0, LEAN = 40;
+const GAP = 0.005;  // hand tiles nearly touch so their sides stay hidden
 
 const FACE: Record<string, string[]> = {
   m: ["", "Man1", "Man2", "Man3", "Man4", "Man5", "Man6", "Man7", "Man8", "Man9"],
@@ -112,10 +113,10 @@ function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceC
 
 function hand(rel: number, codes: string[] | number) {
   const n = typeof codes === "number" ? codes : codes.length;
-  const span = (n - 1) * (TW + 0.04);
+  const span = (n - 1) * (TW + GAP);
   const yLean = TH / 2 * Math.cos(LEAN * Math.PI / 180) + 0.05;
   for (let i = 0; i < n; i++) {
-    const off = -span / 2 + i * (TW + 0.04);
+    const off = -span / 2 + i * (TW + GAP);
     const code = typeof codes === "number" ? undefined : codes[i];
     if (rel === 0) tile(off, yLean, EDGE, -LEAN, 0, code);    // you: reclined, face up toward camera
     else if (rel === 2) tile(-off, TH / 2, -EDGE, 0, 0);      // opponents: upright amber (backs)
