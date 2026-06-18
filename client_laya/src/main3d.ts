@@ -182,8 +182,9 @@ async function main() {
   tileMesh = roundedTileMesh(TW, TH, TT, R, SEG, BEV);
   panelMesh = Laya.PrimitiveMesh.createQuad(TW * 0.82, TH * 0.84);
   symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.72, TH * 0.72);
-  bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.93, 0.85, 0.62, 1);
+  bodyMat = new Laya.BlinnPhongMaterial(); bodyMat.albedoColor = new Laya.Color(0.93, 0.85, 0.62, 0.8);
   bodyMat.specularColor = new Laya.Color(1, 1, 1, 1); bodyMat.shininess = 0.55;  // gloss
+  bodyMat.renderMode = Laya.BlinnPhongMaterial.RENDERMODE_TRANSPARENT;            // honey-resin translucency
   bodyMat.cull = Laya.RenderState.CULL_NONE;   // double-sided: tolerant of mesh winding
   frontMat = new Laya.UnlitMaterial();
   const frontTex = Laya.loader.getRes(url("Front")) as Laya.Texture;
