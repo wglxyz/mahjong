@@ -4,7 +4,7 @@
 const logEl = document.getElementById("log")!;
 const log = (s: string) => { const d = document.createElement("div"); d.textContent = s; logEl.appendChild(d); };
 
-const DEBUG_SINGLE = false;
+const DEBUG_SINGLE = true;   // close-up of one tile, turned to show its side
 
 // real riichi tile ~ 20(W) x 28(H) x 16(D) mm. amber body (BD) + a thin real
 // WHITE front block (FD) on top — the white must be a 3D block, not a flat decal.
@@ -139,10 +139,8 @@ function pond(rel: number, codes: string[]) {
 }
 
 function buildSingle() {
-  const y = TH / 2;
-  tile(-0.9, y, 0, 0, 0, "m5");
-  tile(0, y, 0, 0, 0);
-  tile(0.9, y, 0, 0, 0, "z7");
+  // one tile turned 38° about Y + tilted back so face, right SIDE and top all show
+  tile(0, TH / 2, 0, -8, 38, "m5");
 }
 
 function overlay() {
