@@ -94,21 +94,6 @@ function faceMat(name: string): Laya.UnlitMaterial {
 // amber back faces the camera, with the white rim showing around it.)
 // amber tile body + (if faced) a WHITE face panel + symbol on the front (+Z local).
 // White face vs amber sides gives the colour contrast that reads as thickness.
-// dark contour lines that outline the tile so the thickness + the white/amber
-// seam read clearly (3D shading alone wasn't enough).
-function addEdges(parent: Laya.Sprite3D) {
-  const ln = new Laya.PixelLineSprite3D(24) as Laya.PixelLineSprite3D;
-  const c = new Laya.Color(0.14, 0.09, 0.04, 1);
-  const hw = TW / 2, hh = TH / 2;
-  const zf = BD / 2 + FD, zs = BD / 2, zb = -BD / 2;   // front / white-amber seam / back
-  const V = (a: number, b: number, d: number) => new Laya.Vector3(a, b, d);
-  const corners: [number, number][] = [[hw, hh], [-hw, hh], [-hw, -hh], [hw, -hh]];
-  const rect = (d: number) => { for (let i = 0; i < 4; i++) ln.addLine(V(corners[i][0], corners[i][1], d), V(corners[(i + 1) % 4][0], corners[(i + 1) % 4][1], d), c, c); };
-  const vert = (d1: number, d2: number) => { for (const [px, py] of corners) ln.addLine(V(px, py, d1), V(px, py, d2), c, c); };
-  rect(zf); rect(zs); rect(zb); vert(zf, zs); vert(zs, zb);
-  parent.addChild(ln);
-}
-
 function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceCode?: string) {
   const sp = scene.addChild(new Laya.MeshSprite3D(amberMesh)) as Laya.MeshSprite3D;  // amber body
   sp.meshRenderer.sharedMaterial = amberMat;
@@ -117,13 +102,12 @@ function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceC
   if (faceCode) {
     const white = new Laya.MeshSprite3D(whiteMesh) as Laya.MeshSprite3D;            // real thin white block
     white.meshRenderer.sharedMaterial = whiteMat;
-    white.transform.localPosition = new Laya.Vector3(0, 0, (BD + FD) / 2 + 0.004);
+    white.transform.localPosition = new Laya.Vector3(0, 0, (BD + FD) / 2);  // flush onto amber front -> one continuous tile
     sp.addChild(white);
     const sym = new Laya.MeshSprite3D(symMesh) as Laya.MeshSprite3D;
     sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
     sym.transform.localPosition = new Laya.Vector3(0, 0, FD / 2 + 0.006);
     white.addChild(sym);
-    addEdges(sp);   // contour lines: white-amber seam + thickness edges
   }
   return sp;
 }
@@ -188,12 +172,14 @@ async function main() {
 
   scene = Laya.stage.addChild(new Laya.Scene3D()) as Laya.Scene3D;
   scene.ambientMode = Laya.AmbientMode.SolidColor;
-  scene.ambientColor = new Laya.Color(0.78, 0.78, 0.78, 1);
+  // soft fill (ambient) + a key directional from upper-front so the bevel rim
+  // catches a specular highlight -> the rounded edge/thickness reads.
+  scene.ambientColor = new Laya.Color(0.62, 0.62, 0.62, 1);
   scene.ambientIntensity = 1;
   const lightNode = scene.addChild(new Laya.Sprite3D()) as Laya.Sprite3D;
   const dl = lightNode.addComponent(Laya.DirectionLightCom);
-  dl.color = new Laya.Color(1, 1, 1, 1); dl.intensity = 0.5;
-  lightNode.transform.rotationEuler = new Laya.Vector3(-55, 25, 0);
+  dl.color = new Laya.Color(1, 1, 0.97, 1); dl.intensity = 0.85;
+  lightNode.transform.rotationEuler = new Laya.Vector3(-50, 18, 0);
 
   const camera = scene.addChild(new Laya.Camera(0, 0.1, 200)) as Laya.Camera;
   camera.clearFlag = Laya.CameraClearFlags.SolidColor;
@@ -205,13 +191,14 @@ async function main() {
   amberMesh = roundedTileMesh(TW, TH, BD, R, SEG, BEV);                 // amber body
   whiteMesh = roundedTileMesh(TW, TH, FD, R, SEG, BEV);  // FULL-size white front block (edge flush -> white side band shows)
   symMesh = Laya.PrimitiveMesh.createQuad(TW * 0.74, TH * 0.74);
-  amberMat = new Laya.BlinnPhongMaterial(); amberMat.albedoColor = new Laya.Color(0.91, 0.71, 0.37, 1);  // amber body/sides
-  amberMat.specularColor = new Laya.Color(1, 1, 1, 1); amberMat.shininess = 0.5;
+  // Semi-gloss tiles (real tile ~ roughness 0.25): the specular highlight riding
+  // the beveled edges is what reads as 3D thickness (the Mahjong-Soul look),
+  // not contour lines. amber body #e9b501-ish, cream face.
+  amberMat = new Laya.BlinnPhongMaterial(); amberMat.albedoColor = new Laya.Color(0.88, 0.66, 0.18, 1);
+  amberMat.specularColor = new Laya.Color(0.8, 0.7, 0.45, 1); amberMat.shininess = 0.72;
   amberMat.cull = Laya.RenderState.CULL_NONE;
-  // LIT white (BlinnPhong) so side faces shade darker than the front -> the white
-  // block's thickness/edges read (UnlitMaterial was flat = no visible thickness).
-  whiteMat = new Laya.BlinnPhongMaterial(); whiteMat.albedoColor = new Laya.Color(0.97, 0.96, 0.91, 1);
-  whiteMat.specularColor = new Laya.Color(1, 1, 1, 1); whiteMat.shininess = 0.5;
+  whiteMat = new Laya.BlinnPhongMaterial(); whiteMat.albedoColor = new Laya.Color(0.95, 0.94, 0.88, 1);
+  whiteMat.specularColor = new Laya.Color(1, 1, 0.96, 1); whiteMat.shininess = 0.78;
   whiteMat.cull = Laya.RenderState.CULL_NONE;
 
   if (DEBUG_SINGLE) { buildSingle(); log("single-tile view"); return; }
