@@ -94,6 +94,21 @@ function faceMat(name: string): Laya.UnlitMaterial {
 // amber back faces the camera, with the white rim showing around it.)
 // amber tile body + (if faced) a WHITE face panel + symbol on the front (+Z local).
 // White face vs amber sides gives the colour contrast that reads as thickness.
+// dark contour lines that outline the tile so the thickness + the white/amber
+// seam read clearly (3D shading alone wasn't enough).
+function addEdges(parent: Laya.Sprite3D) {
+  const ln = new Laya.PixelLineSprite3D(24) as Laya.PixelLineSprite3D;
+  const c = new Laya.Color(0.14, 0.09, 0.04, 1);
+  const hw = TW / 2, hh = TH / 2;
+  const zf = BD / 2 + FD, zs = BD / 2, zb = -BD / 2;   // front / white-amber seam / back
+  const V = (a: number, b: number, d: number) => new Laya.Vector3(a, b, d);
+  const corners: [number, number][] = [[hw, hh], [-hw, hh], [-hw, -hh], [hw, -hh]];
+  const rect = (d: number) => { for (let i = 0; i < 4; i++) ln.addLine(V(corners[i][0], corners[i][1], d), V(corners[(i + 1) % 4][0], corners[(i + 1) % 4][1], d), c, c); };
+  const vert = (d1: number, d2: number) => { for (const [px, py] of corners) ln.addLine(V(px, py, d1), V(px, py, d2), c, c); };
+  rect(zf); rect(zs); rect(zb); vert(zf, zs); vert(zs, zb);
+  parent.addChild(ln);
+}
+
 function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceCode?: string) {
   const sp = scene.addChild(new Laya.MeshSprite3D(amberMesh)) as Laya.MeshSprite3D;  // amber body
   sp.meshRenderer.sharedMaterial = amberMat;
@@ -108,6 +123,7 @@ function tile(x: number, y: number, z: number, rotX: number, rotY: number, faceC
     sym.meshRenderer.sharedMaterial = faceMat(faceFile(faceCode));
     sym.transform.localPosition = new Laya.Vector3(0, 0, FD / 2 + 0.006);
     white.addChild(sym);
+    addEdges(sp);   // contour lines: white-amber seam + thickness edges
   }
   return sp;
 }
@@ -172,11 +188,11 @@ async function main() {
 
   scene = Laya.stage.addChild(new Laya.Scene3D()) as Laya.Scene3D;
   scene.ambientMode = Laya.AmbientMode.SolidColor;
-  scene.ambientColor = new Laya.Color(0.42, 0.42, 0.42, 1);   // lower ambient so shading shows
+  scene.ambientColor = new Laya.Color(0.78, 0.78, 0.78, 1);
   scene.ambientIntensity = 1;
   const lightNode = scene.addChild(new Laya.Sprite3D()) as Laya.Sprite3D;
   const dl = lightNode.addComponent(Laya.DirectionLightCom);
-  dl.color = new Laya.Color(1, 1, 1, 1); dl.intensity = 0.9;   // stronger directional -> face/side brightness differ
+  dl.color = new Laya.Color(1, 1, 1, 1); dl.intensity = 0.5;
   lightNode.transform.rotationEuler = new Laya.Vector3(-55, 25, 0);
 
   const camera = scene.addChild(new Laya.Camera(0, 0.1, 200)) as Laya.Camera;
