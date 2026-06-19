@@ -30,7 +30,7 @@ const PONDS = [
 
 let scene: Laya.Scene3D;
 let amberMesh: Laya.Mesh, whiteMesh: Laya.Mesh, symMesh: Laya.Mesh;
-let amberMat: Laya.BlinnPhongMaterial, whiteMat: Laya.UnlitMaterial;
+let amberMat: Laya.BlinnPhongMaterial, whiteMat: Laya.BlinnPhongMaterial;
 const faceCache = new Map<string, Laya.UnlitMaterial>();
 
 // rounded-rect outline points (CCW), 4*(seg+1) of them
@@ -172,12 +172,12 @@ async function main() {
 
   scene = Laya.stage.addChild(new Laya.Scene3D()) as Laya.Scene3D;
   scene.ambientMode = Laya.AmbientMode.SolidColor;
-  scene.ambientColor = new Laya.Color(0.78, 0.78, 0.78, 1);
+  scene.ambientColor = new Laya.Color(0.42, 0.42, 0.42, 1);   // lower ambient so shading shows
   scene.ambientIntensity = 1;
   const lightNode = scene.addChild(new Laya.Sprite3D()) as Laya.Sprite3D;
   const dl = lightNode.addComponent(Laya.DirectionLightCom);
-  dl.color = new Laya.Color(1, 1, 1, 1); dl.intensity = 0.5;
-  lightNode.transform.rotationEuler = new Laya.Vector3(-60, 20, 0);
+  dl.color = new Laya.Color(1, 1, 1, 1); dl.intensity = 0.9;   // stronger directional -> face/side brightness differ
+  lightNode.transform.rotationEuler = new Laya.Vector3(-55, 25, 0);
 
   const camera = scene.addChild(new Laya.Camera(0, 0.1, 200)) as Laya.Camera;
   camera.clearFlag = Laya.CameraClearFlags.SolidColor;
@@ -192,7 +192,10 @@ async function main() {
   amberMat = new Laya.BlinnPhongMaterial(); amberMat.albedoColor = new Laya.Color(0.91, 0.71, 0.37, 1);  // amber body/sides
   amberMat.specularColor = new Laya.Color(1, 1, 1, 1); amberMat.shininess = 0.5;
   amberMat.cull = Laya.RenderState.CULL_NONE;
-  whiteMat = new Laya.UnlitMaterial(); whiteMat.albedoColor = new Laya.Color(0.98, 0.97, 0.93, 1);       // bright white face (contrast vs amber)
+  // LIT white (BlinnPhong) so side faces shade darker than the front -> the white
+  // block's thickness/edges read (UnlitMaterial was flat = no visible thickness).
+  whiteMat = new Laya.BlinnPhongMaterial(); whiteMat.albedoColor = new Laya.Color(0.97, 0.96, 0.91, 1);
+  whiteMat.specularColor = new Laya.Color(1, 1, 1, 1); whiteMat.shininess = 0.5;
   whiteMat.cull = Laya.RenderState.CULL_NONE;
 
   if (DEBUG_SINGLE) { buildSingle(); log("single-tile view"); return; }
